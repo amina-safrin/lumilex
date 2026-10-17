@@ -65,6 +65,12 @@ export default function LearningJourney() {
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
       }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        try { mediaRecorderRef.current.stop(); } catch (error) { /* already stopped */ }
+      }
+      if (microphoneStreamRef.current) {
+        microphoneStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
     };
   }, []);
 
@@ -94,7 +100,9 @@ export default function LearningJourney() {
   const [mistakesInCurrentLesson, setMistakesInCurrentLesson] = useState([]);
   const [reviewIndex, setReviewIndex] = useState(0);
 
-  const speechRecognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const microphoneStreamRef = useRef(null);
 
   const garden = useMemo(() => getGardenStage(learningState), [learningState]);
   const trickyItems = useMemo(() => getTrickyItems(), [errorTracker]);
@@ -215,17 +223,19 @@ export default function LearningJourney() {
   // VOICE READING & CAPTURE IN LESSONS
   // Child can speak the letter/word into the microphone!
   // =========================================================
-  const toggleVoiceCapture = () => {
+  const toggleVoiceCapture = async () => {
+    // Pressing the microphone again stops recording and sends the audio to Whisper.
     if (isVoiceListening) {
-      stopVoiceCapture();
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+      setIsVoiceListening(false);
+      setVoiceFeedback("Checking your reading... 🎧");
       return;
     }
 
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      setVoiceFeedback("Voice recognition works best in Chrome or Edge!");
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setVoiceFeedback("Audio recording is not supported here. Please use Chrome or Edge on localhost.");
       return;
     }
 
@@ -233,46 +243,89 @@ export default function LearningJourney() {
       window.speechSynthesis.cancel();
       playTapSound();
       setVoiceHeardText("");
-      setVoiceFeedback("Listening... say the word out loud! 🎤");
+      setVoiceFeedback("Listening... say the word, then tap the microphone again. 🎤");
 
-      const recognition = new SpeechRecognition();
-      recognition.lang = "en-US";
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 3;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      microphoneStreamRef.current = stream;
+      audioChunksRef.current = [];
 
-      recognition.onstart = () => {
-        setIsVoiceListening(true);
+      const preferredType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : (MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "");
+      const recorder = preferredType
+        ? new MediaRecorder(stream, { mimeType: preferredType })
+        : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) audioChunksRef.current.push(event.data);
       };
 
-      recognition.onresult = (event) => {
-        const spoken = event.results[0][0].transcript.toLowerCase().trim();
-        setVoiceHeardText(spoken);
-        evaluateSpokenWord(spoken);
-      };
-
-      recognition.onerror = (event) => {
+      recorder.onerror = () => {
         setIsVoiceListening(false);
-        setVoiceFeedback("Could not hear clearly. Try again or tap an option!");
+        setVoiceFeedback("The recording had a problem. Please try again.");
+        stream.getTracks().forEach((track) => track.stop());
+        microphoneStreamRef.current = null;
       };
 
-      recognition.onend = () => {
-        setIsVoiceListening(false);
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        microphoneStreamRef.current = null;
+        mediaRecorderRef.current = null;
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        audioChunksRef.current = [];
+        if (!audioBlob.size) {
+          setVoiceFeedback("I couldn't hear any audio. Try speaking a little louder.");
+          return;
+        }
+
+        try {
+          const formData = new FormData();
+          const extension = (audioBlob.type || "").includes("mp4") ? "m4a" : "webm";
+          formData.append("audio", audioBlob, `reading.${extension}`);
+          const expectedWords = [currentQuestion?.question, currentQuestion?.answer, currentQuestion?.pictureLabel]
+            .filter(Boolean).join(" ");
+          if (expectedWords) formData.append("prompt", expectedWords);
+
+          const response = await fetch("http://localhost:5000/api/speech/transcribe", {
+            method: "POST",
+            body: formData,
+            credentials: "include"
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.details || result.error || "Whisper transcription failed");
+          const spoken = String(result.text || "").toLowerCase().trim();
+          if (!spoken) {
+            setVoiceFeedback("I couldn't catch that word. No worries — try once more!");
+            return;
+          }
+          setVoiceHeardText(spoken);
+          evaluateSpokenWord(spoken);
+        } catch (error) {
+          console.error("Whisper transcription request failed:", error);
+          setVoiceFeedback("I couldn't check the audio. Make sure both the LumiLex backend and Whisper server are running.");
+        }
       };
 
-      recognition.start();
-      speechRecognitionRef.current = recognition;
-    } catch (e) {
+      recorder.start();
+      setIsVoiceListening(true);
+    } catch (error) {
+      console.error("Microphone setup failed:", error);
       setIsVoiceListening(false);
-      setVoiceFeedback("Please enable microphone permissions.");
+      setVoiceFeedback(error?.name === "NotAllowedError"
+        ? "Please allow microphone access in your browser, then try again."
+        : "I couldn't start the microphone. Please check your microphone and try again.");
     }
   };
 
   const stopVoiceCapture = () => {
-    if (speechRecognitionRef.current) {
-      try {
-        speechRecognitionRef.current.stop();
-      } catch (e) {}
-      speechRecognitionRef.current = null;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try { mediaRecorderRef.current.stop(); } catch (error) { console.warn(error); }
+    }
+    if (microphoneStreamRef.current) {
+      microphoneStreamRef.current.getTracks().forEach((track) => track.stop());
+      microphoneStreamRef.current = null;
     }
     setIsVoiceListening(false);
   };

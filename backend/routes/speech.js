@@ -55,7 +55,13 @@ router.post("/transcribe", upload.single("audio"), async (req, res) => {
             }
         );
 
-        const whisperData = await whisperResponse.json();
+        const responseText = await whisperResponse.text();
+        let whisperData;
+        try {
+            whisperData = JSON.parse(responseText);
+        } catch {
+            throw new Error(`Whisper returned a non-JSON response (HTTP ${whisperResponse.status}). Check that the Python Whisper server is running at ${whisperUrl}.`);
+        }
 
         if (!whisperResponse.ok) {
             return res.status(500).json({

@@ -16,6 +16,7 @@ import {
   ArrowRight,
   Sprout,
   Star,
+  Crown,
 } from "lucide-react";
 import { getLearningState, getGardenStage } from "../utils/learningRewards";
 import { getErrorTrackerState } from "../utils/errorTracker";
