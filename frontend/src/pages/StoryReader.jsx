@@ -1,8 +1,90 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  Volume2,
+  VolumeX,
+  Type,
+  Split,
+  Eye,
+  Check,
+  RotateCcw,
+  Sparkles,
+  BookOpen
+} from "lucide-react";
 import "./StoryReader.css";
 
 import { recordStoryCompletion } from "../utils/learningRewards";
+import {
+  playSuccessChime,
+  playTapSound,
+  playHintSound,
+  getFriendlyVoice
+} from "../utils/childAudio";
+
+// =========================================================
+// DYSLEXIA-FRIENDLY PHONETIC & LEVENSHTEIN MATCHER
+// Accommodates common dyslexia pronunciation stumbles,
+// letter transpositions (b <-> d, p <-> q, m <-> w),
+// and slight vowel shifts without frustrating the child.
+// =========================================================
+
+function levenshteinDistance(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+function isDyslexiaMatch(spoken, expected) {
+  if (spoken === expected) return true;
+  if (!spoken || !expected) return false;
+
+  // 1. Common dyslexia letter transpositions check (b <-> d, p <-> q, m <-> w)
+  const normSpoken = spoken.replace(/d/g, "b").replace(/q/g, "p").replace(/w/g, "m");
+  const normExpected = expected.replace(/d/g, "b").replace(/q/g, "p").replace(/w/g, "m");
+  if (normSpoken === normExpected) return true;
+
+  // 2. Levenshtein edit distance for minor pronunciation stumbles or accents
+  const dist = levenshteinDistance(spoken, expected);
+  if (expected.length <= 3 && dist <= 1) return true;
+  if (expected.length > 3 && dist <= 2) return true;
+
+  // 3. Substring match for prefixes/suffixes
+  if (expected.length >= 5 && (spoken.startsWith(expected) || expected.startsWith(spoken))) {
+    return true;
+  }
+
+  return false;
+}
+
+// Simple English syllable splitter for visual reading aid
+function splitSyllables(word) {
+  const clean = word.replace(/[.,!?;:"'()]/g, "");
+  if (clean.length <= 4) return word;
+
+  const withSyllables = clean
+    .replace(/(ing|tion|sion|ed|er|est|ly|ful|ness|ment|able|ible)$/i, "·$1")
+    .replace(/^(un|re|in|dis|pre|mis)/i, "$1·")
+    .replace(/([bcdfghjklmnpqrstvwxyz])([bcdfghjklmnpqrstvwxyz])/gi, "$1·$2");
+
+  return word.replace(clean, withSyllables);
+}
 
 export default function StoryReader() {
   const navigate = useNavigate();
@@ -11,7 +93,6 @@ export default function StoryReader() {
   // ==========================================
   // STORY
   // ==========================================
-
   const [content, setContent] = useState(null);
   const [storyLoading, setStoryLoading] = useState(true);
   const [storyError, setStoryError] = useState("");
@@ -19,20 +100,23 @@ export default function StoryReader() {
   // ==========================================
   // READ ALOUD
   // ==========================================
-
   const [isReading, setIsReading] = useState(false);
   const [activeWord, setActiveWord] = useState(null);
 
   // ==========================================
+  // DYSLEXIA ASSISTANCE CONTROLS
+  // ==========================================
+  const [dyslexiaFont, setDyslexiaFont] = useState(true);
+  const [showSyllables, setShowSyllables] = useState(false);
+  const [showReadingRuler, setShowReadingRuler] = useState(true);
+
+  // ==========================================
   // LUMILEX LIVE READING
   // ==========================================
-
   const [isListening, setIsListening] = useState(false);
-
   const [speechSupported, setSpeechSupported] = useState(
     typeof MediaRecorder !== "undefined"
   );
-
   const [speechError, setSpeechError] = useState("");
   const [pauseMessage, setPauseMessage] = useState("");
 
@@ -42,57 +126,39 @@ export default function StoryReader() {
   // Current word LumiLex expects
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
 
-  // Essential reading is always available; energy is reserved for optional games.
   const [hasStartedReading, setHasStartedReading] = useState(false);
 
   // ==========================================
-  // PROGRESS
+  // PROGRESS & COMPLETION
   // ==========================================
-
   const [readingProgress, setReadingProgress] = useState(0);
-
-  // ==========================================
-  // COMPLETION
-  // ==========================================
-
   const [showCompletion, setShowCompletion] = useState(false);
   const [starsEarned, setStarsEarned] = useState(0);
 
   // ==========================================
   // REFS
   // ==========================================
-
   const speechRef = useRef(null);
-
-  // MediaRecorder replaces browser SpeechRecognition
   const mediaRecorderRef = useRef(null);
-
+  const speechRecognitionRef = useRef(null);
   const listeningRef = useRef(false);
-
   const completionRef = useRef(false);
-
   const expectedWordIndexRef = useRef(0);
-
   const pauseTimerRef = useRef(null);
-
   const recordingTimerRef = useRef(null);
 
   // ==========================================
   // LOAD STORY
   // ==========================================
-
   useEffect(() => {
     const fetchStory = async () => {
       try {
         setStoryLoading(true);
         setStoryError("");
 
-        const response = await fetch(
-          `http://localhost:5000/api/stories/${id}`,
-          {
-            credentials: "include",
-          }
-        );
+        const response = await fetch(`http://localhost:5000/api/stories/${id}`, {
+          credentials: "include",
+        });
 
         if (!response.ok) {
           throw new Error("Failed to fetch story");
@@ -102,7 +168,6 @@ export default function StoryReader() {
 
         setContent({
           title: selectedStory.title,
-
           paragraphs: selectedStory.content
             .split(/\n\s*\n/)
             .map((paragraph) => paragraph.trim())
@@ -110,7 +175,6 @@ export default function StoryReader() {
         });
       } catch (error) {
         console.error("Error loading story:", error);
-
         setStoryError("Unable to load this story.");
         setContent(null);
       } finally {
@@ -122,108 +186,24 @@ export default function StoryReader() {
   }, [id]);
 
   // ==========================================
-  // FRIENDLY VOICE
-  // ==========================================
-
-  const getFriendlyVoice = () => {
-    const voices = window.speechSynthesis.getVoices();
-
-    if (!voices || voices.length === 0) {
-      return null;
-    }
-
-    const preferredNames = [
-      "Samantha",
-      "Ava",
-      "Karen",
-      "Moira",
-      "Google US English",
-      "Google UK English Female",
-      "Microsoft Aria Online",
-      "Microsoft Jenny Online",
-      "Microsoft Zira",
-      "Microsoft Sonia",
-    ];
-
-    for (const preferredName of preferredNames) {
-      const voice = voices.find(
-        (v) =>
-          v.name
-            .toLowerCase()
-            .includes(preferredName.toLowerCase()) &&
-          v.lang.toLowerCase().startsWith("en")
-      );
-
-      if (voice) {
-        return voice;
-      }
-    }
-
-    const englishVoice = voices.find((voice) =>
-      voice.lang.toLowerCase().startsWith("en")
-    );
-
-    return englishVoice || voices[0];
-  };
-
-  // ==========================================
-  // LOAD SPEECH VOICES
-  // ==========================================
-
-  useEffect(() => {
-    const loadVoices = () => {
-      window.speechSynthesis.getVoices();
-    };
-
-    loadVoices();
-
-    window.speechSynthesis.addEventListener(
-      "voiceschanged",
-      loadVoices
-    );
-
-    return () => {
-      window.speechSynthesis.removeEventListener(
-        "voiceschanged",
-        loadVoices
-      );
-    };
-  }, []);
-
-  // ==========================================
   // GET ALL STORY WORDS
   // ==========================================
-
   const getStoryWords = () => {
-    if (!content) {
-      return [];
-    }
-
+    if (!content) return [];
     const words = [];
-
-    content.paragraphs.forEach(
-      (paragraph, paragraphIndex) => {
-        const paragraphWords = paragraph.split(/\s+/);
-
-        paragraphWords.forEach(
-          (word, wordIndex) => {
-            words.push({
-              word,
-              paragraphIndex,
-              wordIndex,
-              uniqueIndex: `${paragraphIndex}-${wordIndex}`,
-            });
-          }
-        );
-      }
-    );
-
+    content.paragraphs.forEach((paragraph, paragraphIndex) => {
+      const paragraphWords = paragraph.split(/\s+/);
+      paragraphWords.forEach((word, wordIndex) => {
+        words.push({
+          word,
+          paragraphIndex,
+          wordIndex,
+          uniqueIndex: `${paragraphIndex}-${wordIndex}`,
+        });
+      });
+    });
     return words;
   };
-
-  // ==========================================
-  // NORMALIZE WORD
-  // ==========================================
 
   const normalizeWord = (word) => {
     return word
@@ -235,7 +215,6 @@ export default function StoryReader() {
   // ==========================================
   // PAUSE TIMER
   // ==========================================
-
   const clearPauseTimer = () => {
     if (pauseTimerRef.current) {
       clearTimeout(pauseTimerRef.current);
@@ -245,211 +224,107 @@ export default function StoryReader() {
 
   const startPauseTimer = () => {
     clearPauseTimer();
-
     setPauseMessage("");
 
     pauseTimerRef.current = setTimeout(() => {
       if (listeningRef.current) {
         setPauseMessage(
-          "Take your time! No worries — continue when you're ready. 💚"
+          "Take your time! No worries — continue reading whenever you are ready. 💚"
         );
       }
     }, 4500);
   };
 
   // ==========================================
-  // PROCESS WHISPER TRANSCRIPTION
+  // PROCESS SPOKEN TEXT (ACCURATE + DYSLEXIA MATCHER)
   // ==========================================
-
   const processSpokenText = (spokenText) => {
-  if (!content) {
-    return;
-  }
+    if (!content) return;
 
-  const storyWords = getStoryWords();
+    const storyWords = getStoryWords();
+    if (storyWords.length === 0) return;
 
-  if (storyWords.length === 0) {
-    return;
-  }
+    const spokenWords = spokenText
+      .split(/\s+/)
+      .map(normalizeWord)
+      .filter(Boolean);
 
-  const spokenWords = spokenText
-    .split(/\s+/)
-    .map(normalizeWord)
-    .filter(Boolean);
+    let expectedIndex = expectedWordIndexRef.current;
+    const updatedReadWords = [...readWordIndexes];
 
-  let expectedIndex =
-    expectedWordIndexRef.current;
+    for (const spokenWord of spokenWords) {
+      if (expectedIndex >= storyWords.length) break;
 
-  const updatedReadWords = [...readWordIndexes];
-
-  for (const spokenWord of spokenWords) {
-
-    // Story already completed
-    if (expectedIndex >= storyWords.length) {
-      break;
-    }
-
-    // Ignore filler sounds
-    if (
-      spokenWord === "um" ||
-      spokenWord === "uh" ||
-      spokenWord === "erm" ||
-      spokenWord === "hmm" ||
-      spokenWord === "hm"
-    ) {
-      continue;
-    }
-
-    // ==========================================
-    // LOOK AHEAD FOR THE SPOKEN WORD
-    // ==========================================
-    //
-    // Example:
-    //
-    // Story:
-    // The little rabbit jumps
-    //
-    // Child:
-    // The rabbit jumps
-    //
-    // When "rabbit" is heard:
-    //
-    // "little" -> remains normal
-    // "rabbit" -> becomes read
-    //
-    // We DO NOT mark skipped words.
-    // ==========================================
-
-    let matchedIndex = -1;
-
-    const LOOK_AHEAD = 5;
-
-    for (
-      let i = expectedIndex;
-      i < Math.min(
-        expectedIndex + LOOK_AHEAD,
-        storyWords.length
-      );
-      i++
-    ) {
-
-      const expectedWord =
-        normalizeWord(
-          storyWords[i].word
-        );
-
-      if (spokenWord === expectedWord) {
-        matchedIndex = i;
-        break;
-      }
-    }
-
-    // ==========================================
-    // WORD FOUND
-    // ==========================================
-
-    if (matchedIndex !== -1) {
-
-      const uniqueIndex =
-        storyWords[matchedIndex].uniqueIndex;
-
-      // IMPORTANT:
-      // Only mark the word the child actually said.
-      //
-      // We DO NOT mark the words skipped before it.
-      if (!updatedReadWords.includes(uniqueIndex)) {
-
-        updatedReadWords.push(
-          uniqueIndex
-        );
+      // Ignore filler sounds
+      if (["um", "uh", "erm", "hmm", "hm", "like", "ah"].includes(spokenWord)) {
+        continue;
       }
 
-      // Move expected position to the word
-      // AFTER the word that was recognized.
-      //
-      // Example:
-      //
-      // The [little] [rabbit]
-      //              ↑
-      //
-      // rabbit recognized
-      //
-      // Next expected word = jumps
-      expectedIndex =
-        matchedIndex + 1;
+      // 5-word lookahead to tolerate pauses or skipped words
+      let matchedIndex = -1;
+      const LOOK_AHEAD = 6;
 
-      setCurrentWordIndex(
-        expectedIndex
-      );
-
-      // Update progress based on the
-      // position reached in the story.
-      setReadingProgress(
-        Math.round(
-          (expectedIndex / storyWords.length) * 100
-        )
-      );
-
-      // ==========================================
-      // FINAL WORD
-      // ==========================================
-
-      if (
-        expectedIndex >= storyWords.length
+      for (
+        let i = expectedIndex;
+        i < Math.min(expectedIndex + LOOK_AHEAD, storyWords.length);
+        i++
       ) {
+        const expectedWord = normalizeWord(storyWords[i].word);
+        if (isDyslexiaMatch(spokenWord, expectedWord)) {
+          matchedIndex = i;
+          break;
+        }
+      }
 
-        expectedWordIndexRef.current =
-          expectedIndex;
+      // Word found
+      if (matchedIndex !== -1) {
+        const uniqueIndex = storyWords[matchedIndex].uniqueIndex;
 
-        setReadWordIndexes(
-          updatedReadWords
+        if (!updatedReadWords.includes(uniqueIndex)) {
+          updatedReadWords.push(uniqueIndex);
+        }
+
+        expectedIndex = matchedIndex + 1;
+        setCurrentWordIndex(expectedIndex);
+
+        setReadingProgress(
+          Math.round((expectedIndex / storyWords.length) * 100)
         );
 
-        setReadingProgress(100);
-
-        completeStory();
-
-        return;
+        // Story finished!
+        if (expectedIndex >= storyWords.length) {
+          expectedWordIndexRef.current = expectedIndex;
+          setReadWordIndexes(updatedReadWords);
+          setReadingProgress(100);
+          completeStory();
+          return;
+        }
       }
     }
 
-    // ==========================================
-    // WORD NOT FOUND
-    // ==========================================
-    //
-    // If the spoken word does not match anything
-    // within the next few story words, we simply
-    // ignore it for now.
-    //
-    // The story position does not move.
-    // ==========================================
-  }
-
-  // Save the latest expected position
-  expectedWordIndexRef.current =
-    expectedIndex;
-
-  // Update only the words actually recognized
-  setReadWordIndexes(
-    updatedReadWords
-  );
-};
+    expectedWordIndexRef.current = expectedIndex;
+    setReadWordIndexes(updatedReadWords);
+  };
 
   // ==========================================
-  // SEND AUDIO TO WHISPER
+  // SEND AUDIO TO ACCURATE WHISPER SERVICE
   // ==========================================
-
   const sendAudioToWhisper = async (audioBlob) => {
     try {
-      console.log("Sending audio to Whisper...");
-
       const formData = new FormData();
+      formData.append("audio", audioBlob, "reading.webm");
 
-      formData.append(
-        "audio",
-        audioBlob,
-        "reading.webm"
-      );
+      // Prime Whisper with upcoming story vocabulary for maximum accuracy
+      const storyWords = getStoryWords();
+      const currentIdx = expectedWordIndexRef.current || 0;
+      const promptContext = storyWords
+        .slice(currentIdx, currentIdx + 20)
+        .map((w) => w.word)
+        .join(" ");
+
+      if (promptContext) {
+        formData.append("prompt", promptContext);
+      }
 
       const response = await fetch(
         "http://localhost:5000/api/speech/transcribe",
@@ -461,714 +336,351 @@ export default function StoryReader() {
       );
 
       const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(
-          data.error ||
-            "Whisper transcription failed"
-        );
+        throw new Error(data.error || "Whisper transcription failed");
       }
-
-      console.log(
-        "Whisper heard:",
-        data.text
-      );
 
       if (data.text && data.text.trim()) {
         setPauseMessage("");
-
         startPauseTimer();
-
         processSpokenText(data.text);
       }
     } catch (error) {
-      console.error(
-        "Whisper request failed:",
-        error
-      );
-
-      setSpeechError(
-        "LumiLex couldn't understand the audio. Please continue reading."
-      );
+      console.error("Whisper request failed:", error);
+      // Soft reassurance, don't halt the child's session
     }
   };
 
   // ==========================================
-  // START LUMILEX MICROPHONE LISTENING
+  // START MICROPHONE LISTENING (HYBRID ACCURACY)
   // ==========================================
-
   const startListening = async () => {
-    
     if (!speechSupported) {
       setSpeechError(
         "Microphone recording is not supported in this browser. Please try Google Chrome."
       );
-
       return;
     }
 
-    if (!content) {
-      return;
-    }
-
-    if (isListening) {
-      return;
-    }
+    if (!content || isListening) return;
 
     try {
-      // Stop LumiLex's read-aloud voice
       window.speechSynthesis.cancel();
-
       setIsReading(false);
       setActiveWord(null);
-
       setSpeechError("");
       setPauseMessage("");
 
-      // Reset reading tracking
       setReadWordIndexes([]);
       setCurrentWordIndex(0);
       setReadingProgress(0);
-
       expectedWordIndexRef.current = 0;
-
       completionRef.current = false;
 
-      // Ask browser for microphone access
-      const stream =
-        await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
+      // 1. Browser Speech Recognition (Instant streaming feedback)
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
 
-      // Create recorder
-      const recorder = new MediaRecorder(stream);
+      if (SpeechRecognition) {
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = "en-US";
+
+          recognition.onresult = (event) => {
+            let transcriptChunk = "";
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              if (event.results[i].isFinal) {
+                transcriptChunk += event.results[i][0].transcript + " ";
+              }
+            }
+            if (transcriptChunk.trim()) {
+              setPauseMessage("");
+              startPauseTimer();
+              processSpokenText(transcriptChunk);
+            }
+          };
+
+          recognition.onerror = (err) => {
+            console.log("Speech recognition notification:", err);
+          };
+
+          recognition.start();
+          speechRecognitionRef.current = recognition;
+        } catch (e) {
+          console.log("Browser recognition fallback active.");
+        }
+      }
+
+      // 2. MediaRecorder stream for accurate local Whisper service
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : "audio/webm",
+      });
 
       mediaRecorderRef.current = recorder;
-
       listeningRef.current = true;
-
       setIsListening(true);
-
       startPauseTimer();
 
       let audioChunks = [];
 
-      // ==========================================
-      // AUDIO DATA
-      // ==========================================
-
       recorder.ondataavailable = (event) => {
-        if (
-          event.data &&
-          event.data.size > 0
-        ) {
+        if (event.data && event.data.size > 0) {
           audioChunks.push(event.data);
         }
       };
 
-      // ==========================================
-      // RECORDING STOPPED
-      // ==========================================
-
       recorder.onstop = async () => {
-        if (audioChunks.length === 0) {
-          return;
-        }
+        if (audioChunks.length === 0) return;
 
-        const audioBlob = new Blob(
-          audioChunks,
-          {
-            type:
-              recorder.mimeType ||
-              "audio/webm",
-          }
-        );
-
+        const audioBlob = new Blob(audioChunks, {
+          type: recorder.mimeType || "audio/webm",
+        });
         audioChunks = [];
 
         await sendAudioToWhisper(audioBlob);
 
-        // Continue recording
-        if (
-          listeningRef.current &&
-          !completionRef.current
-        ) {
+        // Continue recording smoothly
+        if (listeningRef.current && !completionRef.current) {
           try {
             recorder.start();
-
-            recordingTimerRef.current =
-              setTimeout(() => {
-                if (
-                  recorder.state ===
-                    "recording" &&
-                  listeningRef.current
-                ) {
-                  recorder.stop();
-                }
-              }, 5000);
+            recordingTimerRef.current = setTimeout(() => {
+              if (recorder.state === "recording" && listeningRef.current) {
+                recorder.stop();
+              }
+            }, 3800);
           } catch (error) {
-            console.error(
-              "Could not restart recorder:",
-              error
-            );
+            console.error("Could not restart recorder:", error);
           }
         }
       };
 
-      // ==========================================
-      // RECORDING ERROR
-      // ==========================================
-
-      recorder.onerror = (event) => {
-        console.error(
-          "MediaRecorder error:",
-          event
-        );
-
-        setSpeechError(
-          "LumiLex couldn't record your voice. Please try again."
-        );
-
-        listeningRef.current = false;
-
-        setIsListening(false);
-
-        clearPauseTimer();
-
-        stream
-          .getTracks()
-          .forEach((track) => track.stop());
+      recorder.onerror = () => {
+        setSpeechError("Microphone error occurred. Please try again.");
+        stopAllListening();
       };
 
-      // ==========================================
-      // START RECORDING
-      // ==========================================
-
       recorder.start();
-
-      recordingTimerRef.current =
-        setTimeout(() => {
-          if (
-            recorder.state === "recording" &&
-            listeningRef.current
-          ) {
-            recorder.stop();
-          }
-        }, 5000);
+      recordingTimerRef.current = setTimeout(() => {
+        if (recorder.state === "recording" && listeningRef.current) {
+          recorder.stop();
+        }
+      }, 3800);
     } catch (error) {
-      console.error(
-        "Microphone error:",
-        error
-      );
-
-      listeningRef.current = false;
-
-      setIsListening(false);
-
-      clearPauseTimer();
-
-      if (
-        error.name === "NotAllowedError"
-      ) {
+      console.error("Microphone error:", error);
+      stopAllListening();
+      if (error.name === "NotAllowedError") {
         setSpeechError(
-          "Microphone access was blocked. Please allow microphone access and try again."
-        );
-      } else if (
-        error.name === "NotFoundError"
-      ) {
-        setSpeechError(
-          "LumiLex couldn't find a microphone. Please check your microphone and try again."
+          "Microphone access was blocked. Please allow microphone access in your browser."
         );
       } else {
-        setSpeechError(
-          "LumiLex couldn't start listening. Please try again."
-        );
+        setSpeechError("Could not start listening. Please try again.");
       }
     }
   };
 
-  // ==========================================
-  // SPEAK INDIVIDUAL WORD
-  // ==========================================
+  const stopAllListening = () => {
+    listeningRef.current = false;
+    setIsListening(false);
+    clearPauseTimer();
 
-  const speakWord = (word, index) => {
-    // Don't interfere with live reading
-    if (isListening) {
-      return;
+    if (recordingTimerRef.current) {
+      clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
     }
+
+    if (mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.state === "recording") {
+          mediaRecorderRef.current.stop();
+        }
+      } catch (e) {}
+      if (mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+      }
+      mediaRecorderRef.current = null;
+    }
+
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch (e) {}
+      speechRecognitionRef.current = null;
+    }
+  };
+
+  // ==========================================
+  // TAP TO HEAR INDIVIDUAL WORD (DYSLEXIA PRONUNCIATION)
+  // ==========================================
+  const speakWord = (word, index) => {
+    if (isListening) return;
 
     window.speechSynthesis.cancel();
+    playTapSound();
 
-    const cleanWord = word.replace(
-      /[.,!?;:"'()]/g,
-      ""
-    );
+    const cleanWord = word.replace(/[.,!?;:"'()]/g, "");
+    if (!cleanWord.trim()) return;
 
-    if (!cleanWord.trim()) {
-      return;
-    }
-
-    const utterance =
-      new SpeechSynthesisUtterance(cleanWord);
-
+    const utterance = new SpeechSynthesisUtterance(cleanWord);
     utterance.lang = "en-US";
-
-    utterance.rate = 0.65;
-
-    utterance.pitch = 1.05;
-
+    utterance.rate = 0.65; // Slower, clear pronunciation
+    utterance.pitch = 1.08;
     utterance.volume = 1;
 
     const voice = getFriendlyVoice();
-
-    if (voice) {
-      utterance.voice = voice;
-    }
+    if (voice) utterance.voice = voice;
 
     setActiveWord(index);
-
-    utterance.onend = () => {
-      setActiveWord(null);
-    };
-
-    utterance.onerror = () => {
-      setActiveWord(null);
-    };
+    utterance.onend = () => setActiveWord(null);
+    utterance.onerror = () => setActiveWord(null);
 
     speechRef.current = utterance;
-
     window.speechSynthesis.speak(utterance);
   };
 
   // ==========================================
   // READ ENTIRE STORY ALOUD
   // ==========================================
-
   const readStoryAloud = () => {
-    if (!content) {
-      return;
-    }
-
-    // Don't interfere with live reading
-    if (isListening) {
-      return;
-    }
+    if (!content || isListening) return;
 
     window.speechSynthesis.cancel();
-
     setIsReading(true);
-
     setActiveWord(null);
 
     let paragraphIndex = 0;
 
     const speakParagraph = () => {
-      if (
-        paragraphIndex >=
-        content.paragraphs.length
-      ) {
+      if (paragraphIndex >= content.paragraphs.length) {
         setIsReading(false);
-
         setActiveWord(null);
-
         return;
       }
 
-      const paragraph =
-        content.paragraphs[paragraphIndex];
+      const paragraph = content.paragraphs[paragraphIndex];
+      const words = paragraph.split(/\s+/);
 
-      const words = paragraph.split(" ");
-
-      const utterance =
-        new SpeechSynthesisUtterance(
-          paragraph
-        );
-
+      const utterance = new SpeechSynthesisUtterance(paragraph);
       utterance.lang = "en-US";
-
       utterance.rate = 0.72;
-
-      utterance.pitch = 1.05;
-
-      utterance.volume = 1;
+      utterance.pitch = 1.08;
 
       const voice = getFriendlyVoice();
-
-      if (voice) {
-        utterance.voice = voice;
-      }
+      if (voice) utterance.voice = voice;
 
       utterance.onboundary = (event) => {
         const position = event.charIndex;
-
-        if (typeof position !== "number") {
-          return;
-        }
+        if (typeof position !== "number") return;
 
         let characterPosition = 0;
-
-        for (
-          let wordIndex = 0;
-          wordIndex < words.length;
-          wordIndex++
-        ) {
+        for (let wordIndex = 0; wordIndex < words.length; wordIndex++) {
           const word = words[wordIndex];
-
           const start = characterPosition;
+          const end = characterPosition + word.length;
 
-          const end =
-            characterPosition + word.length;
-
-          if (
-            position >= start &&
-            position < end
-          ) {
-            const uniqueIndex =
-              `${paragraphIndex}-${wordIndex}`;
-
-            setActiveWord(uniqueIndex);
-
+          if (position >= start && position < end) {
+            setActiveWord(`${paragraphIndex}-${wordIndex}`);
             break;
           }
-
           characterPosition = end + 1;
         }
       };
 
       utterance.onend = () => {
         paragraphIndex++;
-
         setTimeout(() => {
-          if (!isListening) {
-            speakParagraph();
-          }
+          if (!isListening) speakParagraph();
         }, 500);
       };
 
-      utterance.onerror = (event) => {
-        console.error(
-          "Speech synthesis error:",
-          event
-        );
-
+      utterance.onerror = () => {
         setIsReading(false);
-
         setActiveWord(null);
       };
 
       speechRef.current = utterance;
-
       window.speechSynthesis.speak(utterance);
     };
 
     speakParagraph();
   };
 
-  // ==========================================
-  // STOP READ ALOUD
-  // ==========================================
-
   const stopReadingAloud = () => {
     window.speechSynthesis.cancel();
-
     setIsReading(false);
-
     setActiveWord(null);
-  };
-
-  // ==========================================
-  // COMPLETION SOUND
-  // ==========================================
-
-  const playCompletionSound = () => {
-    const audio = new Audio(
-      "/sounds/stars.mp3"
-    );
-
-    audio.volume = 0.7;
-
-    audio.play().catch((error) => {
-      console.error(
-        "Completion sound failed:",
-        error
-      );
-    });
   };
 
   // ==========================================
   // COMPLETE STORY
   // ==========================================
-
   const completeStory = () => {
-    if (completionRef.current) {
-      return;
-    }
+    if (completionRef.current || !hasStartedReading) return;
 
-    if (!hasStartedReading) {
-      return;
-    }
-
-    // Prevent completion before final word
     const storyWords = getStoryWords();
-
-    if (
-      expectedWordIndexRef.current <
-      storyWords.length
-    ) {
-      return;
-    }
+    if (expectedWordIndexRef.current < storyWords.length) return;
 
     completionRef.current = true;
-
-    // ==========================================
-    // STOP MICROPHONE
-    // ==========================================
-
-    listeningRef.current = false;
-
-    clearPauseTimer();
-
-    if (recordingTimerRef.current) {
-      clearTimeout(
-        recordingTimerRef.current
-      );
-
-      recordingTimerRef.current = null;
-    }
-
-    if (mediaRecorderRef.current) {
-      try {
-        if (
-          mediaRecorderRef.current.state ===
-          "recording"
-        ) {
-          mediaRecorderRef.current.stop();
-        }
-      } catch (error) {
-        console.log(
-          "Recorder already stopped."
-        );
-      }
-
-      if (
-        mediaRecorderRef.current.stream
-      ) {
-        mediaRecorderRef.current.stream
-          .getTracks()
-          .forEach(
-            (track) => track.stop()
-          );
-      }
-
-      mediaRecorderRef.current = null;
-    }
-
-    // Stop speech synthesis
+    stopAllListening();
     window.speechSynthesis.cancel();
-
-    setIsListening(false);
-
     setIsReading(false);
-
     setActiveWord(null);
-
     setPauseMessage("");
-
     setReadingProgress(100);
 
-    // ==========================================
-    // AWARD STARS
-    // ==========================================
-
-    const earned = 3;
-
     recordStoryCompletion();
-
-    setStarsEarned(earned);
-
-    // Play reward sound
-    playCompletionSound();
-
-    // Show completion screen
+    setStarsEarned(3);
+    playSuccessChime();
     setShowCompletion(true);
   };
 
-  // ==========================================
-  // START READING
-  // ==========================================
-
   const startReading = () => {
-    // Reading practice never consumes energy.
-    // Story is now officially started
-
     setHasStartedReading(true);
-
     setReadingProgress(0);
-
     setReadWordIndexes([]);
-
     setCurrentWordIndex(0);
-
     expectedWordIndexRef.current = 0;
-
     completionRef.current = false;
-
     setShowCompletion(false);
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-
-    /*
-      IMPORTANT:
-
-      We DO NOT start the microphone here.
-
-      The child must click:
-      "🎤 Read to LumiLex"
-
-      before microphone access begins.
-    */
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // ==========================================
-  // BACK TO STORIES
-  // ==========================================
-
   const backToStories = () => {
-    listeningRef.current = false;
-
-    clearPauseTimer();
-
-    if (recordingTimerRef.current) {
-      clearTimeout(
-        recordingTimerRef.current
-      );
-
-      recordingTimerRef.current = null;
-    }
-
-    if (mediaRecorderRef.current) {
-      try {
-        if (
-          mediaRecorderRef.current.state ===
-          "recording"
-        ) {
-          mediaRecorderRef.current.stop();
-        }
-      } catch (error) {
-        console.log(
-          "Recorder already stopped."
-        );
-      }
-
-      if (
-        mediaRecorderRef.current.stream
-      ) {
-        mediaRecorderRef.current.stream
-          .getTracks()
-          .forEach(
-            (track) => track.stop()
-          );
-      }
-
-      mediaRecorderRef.current = null;
-    }
-
+    stopAllListening();
     window.speechSynthesis.cancel();
-
-    setIsListening(false);
-
-    setIsReading(false);
-
-    setActiveWord(null);
-
     navigate("/stories");
   };
 
-  // ==========================================
-  // CLEANUP
-  // ==========================================
-
   useEffect(() => {
     return () => {
-      listeningRef.current = false;
-
-      clearPauseTimer();
-
-      if (recordingTimerRef.current) {
-        clearTimeout(
-          recordingTimerRef.current
-        );
-      }
-
-      if (mediaRecorderRef.current) {
-        try {
-          if (
-            mediaRecorderRef.current.state ===
-            "recording"
-          ) {
-            mediaRecorderRef.current.stop();
-          }
-        } catch (error) {
-          console.log(
-            "Recorder already stopped."
-          );
-        }
-
-        if (
-          mediaRecorderRef.current.stream
-        ) {
-          mediaRecorderRef.current.stream
-            .getTracks()
-            .forEach(
-              (track) => track.stop()
-            );
-        }
-      }
-
+      stopAllListening();
       window.speechSynthesis.cancel();
     };
   }, []);
-
-  // ==========================================
-  // LOADING
-  // ==========================================
 
   if (storyLoading) {
     return (
       <div className="story-error">
         <div className="story-error-card">
-          <h2>Loading story...</h2>
-
-          <p>
-            Getting your story ready.
-          </p>
+          <h2>Opening your story...</h2>
+          <p>Getting your adventure ready 🌱</p>
         </div>
       </div>
     );
   }
-
-  // ==========================================
-  // STORY ERROR
-  // ==========================================
 
   if (storyError || !content) {
     return (
       <div className="story-error">
         <div className="story-error-card">
           <h2>Story not found</h2>
-
-          <p>
-            {storyError ||
-              "We couldn't find this story."}
-          </p>
-
-          <button
-            onClick={backToStories}
-            className="back-button"
-          >
+          <p>{storyError || "We couldn't find this story."}</p>
+          <button onClick={backToStories} className="back-button">
             Back to Stories
           </button>
         </div>
@@ -1176,195 +688,126 @@ export default function StoryReader() {
     );
   }
 
-  // ==========================================
-  // COMPLETION SCREEN
-  // ==========================================
-
+  // Completion screen
   if (showCompletion) {
     return (
       <div className="completion-screen">
-
         <div className="completion-card">
-
-          <div className="completion-icon">
-            🎉
-          </div>
-
-          <h1>
-            Great Job!
-          </h1>
-
-          <h2>
-            You finished this story!
-          </h2>
-
-          <p className="completion-story-title">
-            {content.title}
-          </p>
-
-          <div className="completion-stars">
-            ⭐ ⭐ ⭐
-          </div>
-
-          <div className="stars-reward">
-            +{starsEarned} Stars
-          </div>
-
+          <div className="completion-icon">🎉</div>
+          <h1>Splendid Reading!</h1>
+          <h2>You finished the entire story!</h2>
+          <p className="completion-story-title">{content.title}</p>
+          <div className="completion-stars">⭐ ⭐ ⭐</div>
+          <div className="stars-reward">+{starsEarned} Stars</div>
           <p className="completion-message">
-            Wonderful reading! Keep exploring
-            new stories and adventures.
+            Every story you read makes your reading skills stronger and brighter.
           </p>
-
           <div className="completion-buttons">
-
             <button
               className="continue-reading-button"
-              onClick={() =>
-                setShowCompletion(false)
-              }
+              onClick={() => setShowCompletion(false)}
             >
-              Stay Here
+              Read Again
             </button>
-
-            <button
-              className="completion-back-button"
-              onClick={backToStories}
-            >
+            <button className="completion-back-button" onClick={backToStories}>
               Back to Stories
             </button>
-
           </div>
-
         </div>
-
       </div>
     );
   }
 
-  // ==========================================
-  // START READING SCREEN
-  // ==========================================
-
+  // Welcome / start reading screen
   if (!hasStartedReading) {
     return (
       <div className="start-reading-screen">
-
         <div className="start-reading-card">
-
-          <div className="start-reading-icon">
-            📖
-          </div>
-
-          <h1>
-            Ready to Read?
-          </h1>
-
-          <h2>
-            {content.title}
-          </h2>
-
+          <div className="start-reading-icon">📖</div>
+          <h1>Ready for an adventure?</h1>
+          <h2>{content.title}</h2>
           <p>
-            Take your time and enjoy the
-            story.
+            Read at your own pace. Tap any word if you want LumiLex to read it aloud.
           </p>
-
-          <button
-            className="start-reading-button"
-            onClick={startReading}
-          >
+          <button className="start-reading-button" onClick={startReading}>
             Start Reading 🌟
           </button>
-
-          <button
-            className="back-button secondary"
-            onClick={backToStories}
-          >
+          <button className="back-button secondary" onClick={backToStories}>
             Back to Stories
           </button>
-
         </div>
-
       </div>
     );
   }
 
-  // ==========================================
-  // MAIN STORY READER
-  // ==========================================
-
+  // Active Story Reader
   return (
-    <div className="story-reader">
-
-      {/* ======================================
-          HEADER
-      ====================================== */}
-
+    <div
+      className={`story-reader ${dyslexiaFont ? "dyslexia-font" : "standard-font"}`}
+    >
+      {/* HEADER */}
       <header className="story-header">
-
-        <button
-          className="back-button"
-          onClick={backToStories}
-        >
+        <button className="back-button" onClick={backToStories}>
           ← Stories
         </button>
 
+        {/* DYSLEXIA COMPANION TOOLBAR */}
+        <div className="dyslexia-toolbar" aria-label="Reading accessibility tools">
+          <button
+            type="button"
+            className={`tool-pill ${dyslexiaFont ? "active" : ""}`}
+            onClick={() => setDyslexiaFont(!dyslexiaFont)}
+            title="Toggle OpenDyslexic font for easier reading"
+          >
+            <Type size={15} />
+            <span>Dyslexia Font</span>
+          </button>
+
+          <button
+            type="button"
+            className={`tool-pill ${showSyllables ? "active" : ""}`}
+            onClick={() => setShowSyllables(!showSyllables)}
+            title="Split words into syllables to read easily"
+          >
+            <Split size={15} />
+            <span>Syllables</span>
+          </button>
+
+          <button
+            type="button"
+            className={`tool-pill ${showReadingRuler ? "active" : ""}`}
+            onClick={() => setShowReadingRuler(!showReadingRuler)}
+            title="Highlight active reading line"
+          >
+            <Eye size={15} />
+            <span>Line Ruler</span>
+          </button>
+        </div>
       </header>
 
-      {/* ======================================
-          STORY
-      ====================================== */}
-
+      {/* STORY MAIN */}
       <main className="story-container">
-
         <div className="story-title-section">
-
-          <h1>
-            {content.title}
-          </h1>
-
-          <p>
-            Read at your own pace 🌱
-          </p>
-
+          <h1>{content.title}</h1>
+          <p>Gentle reading companion for dyslexia 🌱</p>
         </div>
 
-        {/* ====================================
-            PROGRESS
-        ==================================== */}
-
+        {/* READING PROGRESS */}
         <div className="reading-progress">
-
           <div className="progress-header">
-
-            <span>
-              Reading Progress
-            </span>
-
-            <strong>
-              {readingProgress}%
-            </strong>
-
+            <span>Reading Progress</span>
+            <strong>{readingProgress}%</strong>
           </div>
-
           <div className="progress-bar">
-
             <div
               className="progress-fill"
-              style={{
-                width: `${readingProgress}%`,
-              }}
+              style={{ width: `${readingProgress}%` }}
             />
-
           </div>
-
         </div>
 
-        {/* ====================================
-            LISTEN WITH LUMILEX
-        ==================================== */}
-
+        {/* CONTROLS */}
         <div className="reading-controls">
-
           {!isReading ? (
             <button
               className="read-aloud-button"
@@ -1383,14 +826,6 @@ export default function StoryReader() {
             </button>
           )}
 
-        </div>
-
-        {/* ====================================
-            READ TO LUMILEX
-        ==================================== */}
-
-        <div className="voice-reading-section">
-
           {!isListening ? (
             <button
               className="voice-reading-button"
@@ -1400,215 +835,111 @@ export default function StoryReader() {
               🎤 Read to LumiLex
             </button>
           ) : (
+            <button
+              className="voice-reading-button stop"
+              onClick={stopAllListening}
+            >
+              ⏹ Stop Mic
+            </button>
+          )}
+        </div>
+
+        {/* VOICE STATUS */}
+        <div className="voice-reading-section">
+          {isListening && (
             <div className="lumilex-listening-status">
-
               <span className="listening-dot"></span>
-
               <div>
-
-                <strong>
-                  LumiLex is listening...
-                </strong>
-
-                <p>
-                  Read the story aloud at
-                  your own pace 💚
-                </p>
-
+                <strong>LumiLex is listening to your reading...</strong>
+                <p>Read out loud at your own gentle pace 💚</p>
               </div>
-
             </div>
           )}
-
-          {/* Browser doesn't support recording */}
-
-          {!speechSupported && (
-            <div className="speech-error-card">
-
-              <strong>
-                Live reading isn't supported
-                here.
-              </strong>
-
-              <p>
-                Please use Google Chrome for
-                the LumiLex reading feature.
-              </p>
-
-            </div>
-          )}
-
-          {/* Microphone / speech error */}
 
           {speechError && (
             <div className="speech-error-card">
-
-              <strong>
-                Something went wrong
-              </strong>
-
-              <p>
-                {speechError}
-              </p>
-
+              <strong>Note:</strong>
+              <p>{speechError}</p>
             </div>
           )}
-
-          {/* Friendly pause message */}
 
           {pauseMessage && (
             <div className="pause-help-card">
-
-              <span>
-                💚
-              </span>
-
-              <p>
-                {pauseMessage}
-              </p>
-
+              <span>💚</span>
+              <p>{pauseMessage}</p>
             </div>
           )}
-
         </div>
 
-        {/* ====================================
-            STORY CARD
-        ==================================== */}
-
+        {/* STORY CARD */}
         <article className="story-card">
+          {content.paragraphs.map((paragraph, paragraphIndex) => {
+            const words = paragraph.split(/\s+/);
+            const storyWords = getStoryWords();
+            const currentExpected = storyWords[currentWordIndex];
+            const isParagraphActive =
+              currentExpected?.paragraphIndex === paragraphIndex;
 
-          {content.paragraphs.map(
-            (
-              paragraph,
-              paragraphIndex
-            ) => {
+            return (
+              <p
+                key={paragraphIndex}
+                className={`story-paragraph ${
+                  showReadingRuler && isParagraphActive ? "ruler-active" : ""
+                }`}
+              >
+                {words.map((word, wordIndex) => {
+                  const uniqueIndex = `${paragraphIndex}-${wordIndex}`;
+                  const isRead = readWordIndexes.includes(uniqueIndex);
+                  const isCurrent =
+                    currentWordIndex ===
+                    storyWords.findIndex(
+                      (item) => item.uniqueIndex === uniqueIndex
+                    );
 
-              const words =
-                paragraph.split(/\s+/);
+                  let wordClass = "story-word";
+                  if (isRead) wordClass += " read";
+                  if (isCurrent && isListening) wordClass += " current";
+                  if (activeWord === uniqueIndex) wordClass += " active";
 
-              return (
-                <p
-                  key={paragraphIndex}
-                  className="story-paragraph"
-                >
+                  const displayWord = showSyllables
+                    ? splitSyllables(word)
+                    : word;
 
-                  {words.map(
-                    (
-                      word,
-                      wordIndex
-                    ) => {
-
-                      const uniqueIndex =
-                        `${paragraphIndex}-${wordIndex}`;
-
-                      const isRead =
-                        readWordIndexes.includes(
-                          uniqueIndex
-                        );
-
-                      const storyWords =
-                        getStoryWords();
-
-                      const isCurrent =
-                        currentWordIndex ===
-                        storyWords.findIndex(
-                          (item) =>
-                            item.uniqueIndex ===
-                            uniqueIndex
-                        );
-
-                      let wordClass =
-                        "story-word";
-
-                      if (isRead) {
-                        wordClass += " read";
-                      }
-
-                      if (
-                        isCurrent &&
-                        isListening
-                      ) {
-                        wordClass += " current";
-                      }
-
-                      if (
-                        activeWord ===
-                        uniqueIndex
-                      ) {
-                        wordClass += " active";
-                      }
-
-                      return (
-                        <span
-                          key={uniqueIndex}
-                          className={wordClass}
-                          onClick={() =>
-                            speakWord(
-                              word,
-                              uniqueIndex
-                            )
-                          }
-                        >
-                          {word}{" "}
-                        </span>
-                      );
-                    }
-                  )}
-
-                </p>
-              );
-            }
-          )}
-
+                  return (
+                    <span
+                      key={uniqueIndex}
+                      className={wordClass}
+                      onClick={() => speakWord(word, uniqueIndex)}
+                      title="Tap to hear this word"
+                    >
+                      {displayWord}{" "}
+                    </span>
+                  );
+                })}
+              </p>
+            );
+          })}
         </article>
 
-        {/* ====================================
-            READING COMPANION MESSAGE
-        ==================================== */}
-
+        {/* FOOTER HELPER */}
         <div className="reading-companion-footer">
-
           {isListening ? (
             <>
-              <span>
-                🌱
-              </span>
-
-              <p>
-                LumiLex is following along
-                with you. Take your time!
-              </p>
+              <span>🌱</span>
+              <p>LumiLex is following along with your voice. No rush!</p>
             </>
           ) : (
             <>
-              <span>
-                💚
-              </span>
-
-              <p>
-                Tap any word if you want
-                LumiLex to say it for you.
-              </p>
+              <span>💚</span>
+              <p>Tap any word if you want LumiLex to say it for you.</p>
             </>
           )}
-
         </div>
-
       </main>
 
-      {/* ======================================
-          FOOTER
-      ====================================== */}
-
       <footer className="story-footer">
-
-        <p>
-          💚 Take your time. You're doing great!
-        </p>
-
+        <p>💚 Designed with patience and care for children with dyslexia.</p>
       </footer>
-
     </div>
   );
 }

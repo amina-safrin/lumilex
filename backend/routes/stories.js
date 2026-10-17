@@ -480,12 +480,15 @@ You are creating a very short picture-book style story
 for LumiLex AI.
 
 IMPORTANT:
-The target reader is a CHILD AGED 4–5 YEARS OLD.
+The target reader is a YOUNG CHILD WITH DYSLEXIA (aged 4–6).
 
-This is NOT a story for older children.
+This is a reading companion specifically tailored to support children with dyslexia:
+- Use clear, phonetically decodable words and familiar vocabulary.
+- Keep sentences short (3–8 words) and easy to track visually.
+- Avoid long clauses, tricky inversions, or visually confusing word patterns.
+- Use natural repetition of key words so the child feels confident and successful.
+- Warm, joyful, gentle tone with zero scary elements.
 
-The story must be extremely easy for a preschool child
-to listen to and read aloud.
 
 ========================================
 CHILD'S INTERESTS

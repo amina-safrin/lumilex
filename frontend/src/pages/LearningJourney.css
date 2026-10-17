@@ -164,3 +164,176 @@
   .learning-page .question-picture-caption { font-size: 15px; }
   .learning-page .question-picture-audio { padding: 7px; }
 }
+
+/* =========================================================
+   TOPBAR SOUND TOGGLE & COMPOUND WORD BUILDER
+   ========================================================= */
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sound-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid #d5e2d1;
+  border-radius: 20px;
+  background: #fffefa;
+  color: #496d51;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(60, 90, 68, 0.06);
+}
+
+.sound-toggle-btn:hover {
+  background: #eef6ec;
+  border-color: #8bb78f;
+}
+
+/* Compound Word Visualizer */
+.compound-word-builder {
+  margin: 10px 0 22px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f7faf3, #fffdfa);
+  border: 2px dashed #b8d7ba;
+  border-radius: 22px;
+  text-align: center;
+}
+
+.compound-cards-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.compound-part-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 105px;
+  min-height: 125px;
+  padding: 14px 18px;
+  background: #ffffff;
+  border: 2px solid #b7d6b9;
+  border-radius: 18px;
+  cursor: pointer;
+  box-shadow: 0 5px 12px rgba(67, 100, 75, 0.08);
+}
+
+.compound-part-card:hover {
+  border-color: #639a67;
+  background: #f4faef;
+}
+
+.compound-part-card .part-emoji {
+  font-size: 44px;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.compound-part-card .part-text {
+  font-family: Nunito, "OpenDyslexic", sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+  color: #2b4f35;
+  letter-spacing: 0.5px;
+}
+
+.compound-part-card .part-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: #e9f4e6;
+  color: #4a7553;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.compound-plus-icon,
+.compound-equals-sign {
+  font-size: 28px;
+  font-weight: 900;
+  color: #558760;
+  padding: 0 4px;
+}
+
+.compound-result-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+  min-height: 125px;
+  padding: 14px 20px;
+  border-radius: 18px;
+  border: 2px solid #f2c759;
+  background: #fff9e6;
+  box-shadow: 0 6px 14px rgba(180, 130, 20, 0.12);
+}
+
+.compound-result-card.combined {
+  background: linear-gradient(135deg, #fff2be, #e8f7e4);
+  border-color: #7bb580;
+}
+
+.compound-result-card .part-emoji {
+  font-size: 46px;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.compound-result-card .part-text {
+  font-family: Nunito, "OpenDyslexic", sans-serif;
+  font-size: 19px;
+  font-weight: 900;
+  color: #3b5a40;
+}
+
+.compound-result-card .part-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #85611f;
+}
+
+.compound-instruction {
+  margin: 10px auto 0;
+  max-width: 460px;
+  font-size: 13px;
+  color: #5f7564;
+  line-height: 1.5;
+}
+
+@media (max-width: 580px) {
+  .compound-part-card,
+  .compound-result-card {
+    min-width: 80px;
+    min-height: 100px;
+    padding: 10px;
+  }
+  .compound-part-card .part-emoji,
+  .compound-result-card .part-emoji {
+    font-size: 32px;
+  }
+  .compound-part-card .part-text,
+  .compound-result-card .part-text {
+    font-size: 15px;
+  }
+  .compound-plus-icon,
+  .compound-equals-sign {
+    font-size: 22px;
+  }
+}
+

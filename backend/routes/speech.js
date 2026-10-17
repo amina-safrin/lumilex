@@ -6,26 +6,27 @@ const router = express.Router();
 // Keep the uploaded audio in memory.
 // We don't need to permanently save recordings.
 const upload = multer({
-    storage: multer.memoryStorage()
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    }
 });
 
 router.post("/transcribe", upload.single("audio"), async (req, res) => {
-
     try {
-
         if (!req.file) {
             return res.status(400).json({
                 error: "No audio file received"
             });
         }
 
-        console.log("Audio received from LumiLex");
+        console.log("Audio received from LumiLex for transcription");
 
         // Convert the uploaded audio into a Blob
         const audioBlob = new Blob(
             [req.file.buffer],
             {
-                type: req.file.mimetype
+                type: req.file.mimetype || "audio/webm"
             }
         );
 
@@ -35,14 +36,19 @@ router.post("/transcribe", upload.single("audio"), async (req, res) => {
         formData.append(
             "audio",
             audioBlob,
-            req.file.originalname
+            req.file.originalname || "reading.webm"
         );
 
-        console.log("Sending audio to Whisper...");
+        // Optional story context prompt to prime Whisper's decoder for accuracy
+        if (req.body && req.body.prompt) {
+            formData.append("prompt", req.body.prompt);
+        }
+
+        const whisperUrl = process.env.WHISPER_URL || "http://127.0.0.1:8000/transcribe";
 
         // Send audio to our local Python server
         const whisperResponse = await fetch(
-            "http://127.0.0.1:8000/transcribe",
+            whisperUrl,
             {
                 method: "POST",
                 body: formData
@@ -57,13 +63,12 @@ router.post("/transcribe", upload.single("audio"), async (req, res) => {
             });
         }
 
-        console.log("Whisper transcription:", whisperData.text);
+        console.log("Whisper transcription success:", whisperData.text);
 
         // Send Whisper's result back to LumiLex
         res.json(whisperData);
 
     } catch (error) {
-
         console.error("Speech route error:", error);
 
         res.status(500).json({

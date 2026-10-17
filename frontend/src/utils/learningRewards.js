@@ -1,97 +1,642 @@
+// =========================================================
+// LUMILEX DYSLEXIA-FRIENDLY PHONICS & LEARNING REWARDS
+// Built specifically for young readers with dyslexia:
+// - Multisensory: visual picture mnemonics + audio pronunciation
+// - Anti-reversal letter anchors (b vs d, p vs q)
+// - Gradual progression: Letters -> Sounds -> Blends -> Families -> Compound Words -> Sentences
+// - Positive reinforcement: effort stars, badges, growing garden
+// =========================================================
+
 const STORAGE_KEY = "lumilex_learning_rewards_v2";
 const LEGACY_STARS_KEY = "lumilex_stars";
 
 export const LEARNING_LEVELS = [
+  // -------------------------------------------------------
+  // LEVEL 1: Alphabet Picture Garden
+  // Remember letters through vivid, memorable visual anchors.
+  // -------------------------------------------------------
   {
     id: 1,
-    title: "Alphabet Garden",
-    subtitle: "Meet letters with friendly pictures",
-    icon: "🌈",
-    skill: "Alphabet recognition",
-    description: "Look at a picture, hear its name, and find the letter that starts the word.",
+    title: "Alphabet Picture Garden",
+    subtitle: "Remember letters with friendly picture friends",
+    icon: "🍎",
+    skill: "Alphabet & visual letter memory",
+    description: "Look at the picture, hear its friendly name, and spot the letter that starts the word.",
     questions: [
-      { prompt: "Apple begins with which letter?", picture: "🍎", pictureLabel: "Apple", choices: ["A", "B", "C"], answer: "A", hint: "Say apple slowly: /a/pple. Apple starts with A.", soundExamples: [{ label: "/a/", word: "apple" }, { label: "/b/", word: "ball" }, { label: "/c/", word: "cat" }] },
-      { prompt: "Which letter starts the word ball?", picture: "⚽", pictureLabel: "Ball", choices: ["D", "B", "M"], answer: "B", hint: "B is for ball. Listen for /b/ at the beginning.", soundExamples: [{ label: "/b/", word: "ball" }, { label: "/d/", word: "dog" }, { label: "/m/", word: "moon" }] },
-      { prompt: "Find the first letter in cat.", picture: "🐱", pictureLabel: "Cat", choices: ["C", "S", "T"], answer: "C", hint: "Cat starts with the crisp /c/ sound.", soundExamples: [{ label: "/c/", word: "cat" }, { label: "/s/", word: "sun" }, { label: "/t/", word: "top" }] },
-      { prompt: "Dog starts with which letter?", picture: "🐶", pictureLabel: "Dog", choices: ["B", "D", "F"], answer: "D", hint: "Say dog. The first sound is /d/.", soundExamples: [{ label: "/d/", word: "dog" }, { label: "/b/", word: "ball" }, { label: "/f/", word: "fish" }] },
-      { prompt: "Which letter begins the word fish?", picture: "🐠", pictureLabel: "Fish", choices: ["P", "F", "L"], answer: "F", hint: "Fish begins with /f/. Feel the air on your lip as you say it.", soundExamples: [{ label: "/f/", word: "fish" }, { label: "/p/", word: "pig" }, { label: "/l/", word: "leaf" }] },
-    ],
+      {
+        prompt: "Apple begins with which letter?",
+        picture: "🍎",
+        pictureLabel: "Apple",
+        choices: ["A", "B", "C"],
+        answer: "A",
+        hint: "Say apple slowly: /a/pple. A is for Apple! 🍎",
+        letter: "A",
+        soundExamples: [
+          { label: "A", word: "apple" },
+          { label: "B", word: "ball" },
+          { label: "C", word: "cat" }
+        ]
+      },
+      {
+        prompt: "Look at the bouncy Ball! Which letter starts Ball?",
+        picture: "⚽",
+        pictureLabel: "Ball",
+        choices: ["B", "D", "P"],
+        answer: "B",
+        hint: "B has a big bouncy belly in front, just like a Ball! /b/ Ball. ⚽",
+        letter: "B",
+        soundExamples: [
+          { label: "B", word: "ball" },
+          { label: "D", word: "dog" },
+          { label: "P", word: "pig" }
+        ]
+      },
+      {
+        prompt: "Find the letter for the cute sleeping Cat.",
+        picture: "🐱",
+        pictureLabel: "Cat",
+        choices: ["C", "S", "O"],
+        answer: "C",
+        hint: "Letter C is curved like a cozy sleeping cat! /k/ Cat. 🐱",
+        letter: "C",
+        soundExamples: [
+          { label: "C", word: "cat" },
+          { label: "S", word: "sun" },
+          { label: "O", word: "octopus" }
+        ]
+      },
+      {
+        prompt: "Here is a happy puppy Dog! Which letter is Dog?",
+        picture: "🐶",
+        pictureLabel: "Dog",
+        choices: ["D", "B", "T"],
+        answer: "D",
+        hint: "Letter D has its round tummy on the left, waiting for a pet! /d/ Dog. 🐶",
+        letter: "D",
+        soundExamples: [
+          { label: "D", word: "dog" },
+          { label: "B", word: "ball" },
+          { label: "T", word: "tree" }
+        ]
+      },
+      {
+        prompt: "Elephant starts with which big friendly letter?",
+        picture: "🐘",
+        pictureLabel: "Elephant",
+        choices: ["E", "F", "L"],
+        answer: "E",
+        hint: "E is for Elephant! Hear /eh/ at the start. 🐘",
+        letter: "E",
+        soundExamples: [
+          { label: "E", word: "elephant" },
+          { label: "F", word: "fish" },
+          { label: "L", word: "lion" }
+        ]
+      },
+      {
+        prompt: "Fish swims in the pond! Which letter begins Fish?",
+        picture: "🐠",
+        pictureLabel: "Fish",
+        choices: ["F", "P", "T"],
+        answer: "F",
+        hint: "Blow gentle air for /f/: Fish starts with F! 🐠",
+        letter: "F",
+        soundExamples: [
+          { label: "F", word: "fish" },
+          { label: "P", word: "pig" },
+          { label: "T", word: "tree" }
+        ]
+      },
+      {
+        prompt: "Sun shines so bright! Which warm letter starts Sun?",
+        picture: "☀️",
+        pictureLabel: "Sun",
+        choices: ["S", "C", "Z"],
+        answer: "S",
+        hint: "S curves like sunshine: sss-sun! ☀️",
+        letter: "S",
+        soundExamples: [
+          { label: "S", word: "sun" },
+          { label: "C", word: "cat" },
+          { label: "Z", word: "zebra" }
+        ]
+      },
+      {
+        prompt: "Moon glows at night! Which letter begins Moon?",
+        picture: "🌙",
+        pictureLabel: "Moon",
+        choices: ["M", "W", "N"],
+        answer: "M",
+        hint: "Press your lips together for /m/: Moon starts with M! 🌙",
+        letter: "M",
+        soundExamples: [
+          { label: "M", word: "moon" },
+          { label: "W", word: "whale" },
+          { label: "N", word: "nest" }
+        ]
+      }
+    ]
   },
+
+  // -------------------------------------------------------
+  // LEVEL 2: Sound Safari & Letter Phonemes
+  // Hear pure phonemes and distinguish sounds easily.
+  // -------------------------------------------------------
   {
     id: 2,
     title: "Sound Safari",
-    subtitle: "Listen, say it, and spot the sound",
+    subtitle: "Listen, say it, and spot the friendly sound",
     icon: "🦁",
-    skill: "Phonics and letter sounds",
-    description: "Hear a sound in a familiar word and find the letter that makes it.",
+    skill: "Phonological awareness & letter sounds",
+    description: "Listen to the letter sound and match it with its picture friend.",
     questions: [
-      { prompt: "Which word begins with the /m/ sound?", picture: "🌙", pictureLabel: "Listen for /m/", choices: ["Cat", "Moon", "Fish"], answer: "Moon", hint: "Mmm-moon. Your lips come together for /m/.", soundExamples: [{ label: "/m/", word: "moon" }, { label: "/c/", word: "cat" }, { label: "/f/", word: "fish" }] },
-      { prompt: "Tap the word that starts with /s/.", picture: "☀️", pictureLabel: "Sun", choices: ["Sun", "Dog", "Pig"], answer: "Sun", hint: "Stretch the first sound: sssssun.", soundExamples: [{ label: "/s/", word: "sun" }, { label: "/d/", word: "dog" }, { label: "/p/", word: "pig" }] },
-      { prompt: "What sound starts the word goat?", picture: "🐐", pictureLabel: "Goat", choices: ["/g/ as in goat", "/t/ as in top", "/f/ as in fish"], answer: "/g/ as in goat", hint: "Goat starts with /g/. Listen to the word again.", soundExamples: [{ label: "/g/", word: "goat" }, { label: "/t/", word: "top" }, { label: "/f/", word: "fish" }] },
-      { prompt: "Which letter makes the first sound in leaf?", picture: "🍃", pictureLabel: "Leaf", choices: ["L", "M", "P"], answer: "L", hint: "Listen: lllleaf. The sound starts with L.", soundExamples: [{ label: "/l/", word: "leaf" }, { label: "/m/", word: "moon" }, { label: "/p/", word: "pig" }] },
-      { prompt: "Which word starts with /p/?", picture: "🐷", pictureLabel: "Pig", choices: ["Pig", "Apple", "Sun"], answer: "Pig", hint: "P is a quick puff of air: p-p-pig.", soundExamples: [{ label: "/p/", word: "pig" }, { label: "/a/", word: "apple" }, { label: "/s/", word: "sun" }] },
-    ],
+      {
+        prompt: "Which word begins with the gentle /m/ sound?",
+        picture: "🌙",
+        pictureLabel: "Listen for /m/",
+        choices: ["Moon", "Cat", "Sun"],
+        answer: "Moon",
+        hint: "Mmm-moon! Your lips gently touch for /m/. 🌙",
+        soundExamples: [
+          { label: "/m/", word: "moon" },
+          { label: "/k/", word: "cat" },
+          { label: "/s/", word: "sun" }
+        ]
+      },
+      {
+        prompt: "Tap the picture that begins with the sunny /s/ sound.",
+        picture: "☀️",
+        pictureLabel: "Listen for /s/",
+        choices: ["Sun", "Dog", "Pig"],
+        answer: "Sun",
+        hint: "Stretch the sound like gentle breeze: sssss-sun! ☀️",
+        soundExamples: [
+          { label: "/s/", word: "sun" },
+          { label: "/d/", word: "dog" },
+          { label: "/p/", word: "pig" }
+        ]
+      },
+      {
+        prompt: "Which word starts with the bouncy /b/ pop sound?",
+        picture: "⚽",
+        pictureLabel: "Listen for /b/",
+        choices: ["Ball", "Dog", "Fish"],
+        answer: "Ball",
+        hint: "B is a bouncy bubble pop: b-b-ball! ⚽",
+        soundExamples: [
+          { label: "/b/", word: "ball" },
+          { label: "/d/", word: "dog" },
+          { label: "/f/", word: "fish" }
+        ]
+      },
+      {
+        prompt: "Listen: /d/ as in Dog. Which word starts with /d/?",
+        picture: "🐶",
+        pictureLabel: "Listen for /d/",
+        choices: ["Dog", "Ball", "Cat"],
+        answer: "Dog",
+        hint: "Tap your tongue behind your teeth: /d/ /d/ Dog! 🐶",
+        soundExamples: [
+          { label: "/d/", word: "dog" },
+          { label: "/b/", word: "ball" },
+          { label: "/k/", word: "cat" }
+        ]
+      },
+      {
+        prompt: "Which word begins with the quick puff /p/?",
+        picture: "🐷",
+        pictureLabel: "Listen for /p/",
+        choices: ["Pig", "Apple", "Leaf"],
+        answer: "Pig",
+        hint: "P is a light puff of air: p-p-pig! 🐷",
+        soundExamples: [
+          { label: "/p/", word: "pig" },
+          { label: "/a/", word: "apple" },
+          { label: "/l/", word: "leaf" }
+        ]
+      },
+      {
+        prompt: "Which letter makes the gentle /l/ sound in Leaf?",
+        picture: "🍃",
+        pictureLabel: "Leaf",
+        choices: ["L", "M", "T"],
+        answer: "L",
+        hint: "Llll-leaf. Lift your tongue up for L! 🍃",
+        soundExamples: [
+          { label: "L", word: "leaf" },
+          { label: "M", word: "moon" },
+          { label: "T", word: "tree" }
+        ]
+      }
+    ]
   },
+
+  // -------------------------------------------------------
+  // LEVEL 3: Sound Blenders (3-Letter CVC Words)
+  // Sliding individual sounds into friendly little words.
+  // -------------------------------------------------------
   {
     id: 3,
-    title: "Little Word Builders",
-    subtitle: "Blend sounds to build your first words",
+    title: "Little Word Blenders",
+    subtitle: "Slide sounds together to build your first words",
     icon: "🧩",
-    skill: "Blending and short words",
-    description: "Listen to each sound, then slide them together to make a word.",
+    skill: "Sound blending (CVC words)",
+    description: "Hear each individual sound, then smoothly slide them together into a whole word.",
     questions: [
-      { prompt: "Blend /c/ /a/ /t/. What word do they make?", picture: "🐱", pictureLabel: "A cat", choices: ["Cat", "Cup", "Cot"], answer: "Cat", hint: "Say each sound, then make them smooth: c-a-t, cat.", soundExamples: [{ label: "/c/", word: "cat" }, { label: "/a/", word: "apple" }, { label: "/t/", word: "top" }] },
-      { prompt: "Put these sounds together: /s/ /u/ /n/.", picture: "☀️", pictureLabel: "A sunny sun", choices: ["Sit", "Sun", "Sin"], answer: "Sun", hint: "Stretch it slowly: sss-uuu-nnn, sun!", soundExamples: [{ label: "/s/", word: "sun" }, { label: "/u/", word: "up" }, { label: "/n/", word: "net" }] },
-      { prompt: "Which word matches this picture?", picture: "🗺️", pictureLabel: "Map", choices: ["Map", "Mop", "Mug"], answer: "Map", hint: "Say the first, middle, and last sounds in map.", soundExamples: [{ label: "map", word: "map" }, { label: "mop", word: "mop" }, { label: "mug", word: "mug" }] },
-      { prompt: "Which word rhymes with sun?", picture: "🏃", pictureLabel: "Run", choices: ["Map", "Run", "Bed"], answer: "Run", hint: "Sun and run end with the same sound.", soundExamples: [{ label: "sun", word: "sun" }, { label: "run", word: "run" }, { label: "bed", word: "bed" }] },
-      { prompt: "Choose the word for an animal that says meow.", picture: "🐈", pictureLabel: "A cat", choices: ["Dog", "Cat", "Pig"], answer: "Cat", hint: "Tap each word to hear it, then choose the one that matches.", soundExamples: [{ label: "dog", word: "dog" }, { label: "cat", word: "cat" }, { label: "pig", word: "pig" }] },
-    ],
+      {
+        prompt: "Slide /c/ /a/ /t/ together. What word does it make?",
+        picture: "🐱",
+        pictureLabel: "A furry cat",
+        choices: ["Cat", "Cup", "Cot"],
+        answer: "Cat",
+        hint: "Say the sounds smoothly: c... a... t... Cat! 🐱",
+        blendParts: ["/c/", "/a/", "/t/"],
+        soundExamples: [
+          { label: "/c/", word: "cat" },
+          { label: "/a/", word: "apple" },
+          { label: "/t/", word: "top" }
+        ]
+      },
+      {
+        prompt: "Put these sounds together: /s/ /u/ /n/.",
+        picture: "☀️",
+        pictureLabel: "Sunny sun",
+        choices: ["Sun", "Sit", "Sap"],
+        answer: "Sun",
+        hint: "Slide them: sss-uuu-nnn... Sun! ☀️",
+        blendParts: ["/s/", "/u/", "/n/"],
+        soundExamples: [
+          { label: "/s/", word: "sun" },
+          { label: "/u/", word: "up" },
+          { label: "/n/", word: "nest" }
+        ]
+      },
+      {
+        prompt: "Blend /d/ /o/ /g/. What friendly friend is it?",
+        picture: "🐶",
+        pictureLabel: "A waggy dog",
+        choices: ["Dog", "Dig", "Dot"],
+        answer: "Dog",
+        hint: "Say each sound: d... o... g... Dog! 🐶",
+        blendParts: ["/d/", "/o/", "/g/"],
+        soundExamples: [
+          { label: "/d/", word: "dog" },
+          { label: "/o/", word: "octopus" },
+          { label: "/g/", word: "grapes" }
+        ]
+      },
+      {
+        prompt: "Where do we sleep? Blend: /b/ /e/ /d/.",
+        picture: "🛏️",
+        pictureLabel: "Cozy bed",
+        choices: ["Bed", "Bad", "Bug"],
+        answer: "Bed",
+        hint: "b... e... d... Bed! A cozy place to rest. 🛏️",
+        blendParts: ["/b/", "/e/", "/d/"],
+        soundExamples: [
+          { label: "/b/", word: "ball" },
+          { label: "/e/", word: "elephant" },
+          { label: "/d/", word: "dog" }
+        ]
+      },
+      {
+        prompt: "Blend /p/ /i/ /g/. Which pink animal is this?",
+        picture: "🐷",
+        pictureLabel: "Little piggy",
+        choices: ["Pig", "Peg", "Pug"],
+        answer: "Pig",
+        hint: "p... i... g... Pig! Oink oink. 🐷",
+        blendParts: ["/p/", "/i/", "/g/"],
+        soundExamples: [
+          { label: "/p/", word: "pig" },
+          { label: "/i/", word: "in" },
+          { label: "/g/", word: "go" }
+        ]
+      },
+      {
+        prompt: "Blend /b/ /u/ /g/. What tiny crawler is this?",
+        picture: "🐞",
+        pictureLabel: "Little ladybug",
+        choices: ["Bug", "Bag", "Big"],
+        answer: "Bug",
+        hint: "b... u... g... Bug! A friendly little ladybug. 🐞",
+        blendParts: ["/b/", "/u/", "/g/"],
+        soundExamples: [
+          { label: "/b/", word: "ball" },
+          { label: "/u/", word: "up" },
+          { label: "/g/", word: "go" }
+        ]
+      }
+    ]
   },
+
+  // -------------------------------------------------------
+  // LEVEL 4: Word Families & Rhyme Safari
+  // Recognize common word patterns to ease dyslexia decoding.
+  // -------------------------------------------------------
   {
     id: 4,
-    title: "Sentence Builders",
-    subtitle: "Put words together to share an idea",
-    icon: "📝",
-    skill: "Sentence reading",
-    description: "Use familiar words and picture clues to understand short sentences.",
+    title: "Rhyme & Word Families",
+    subtitle: "Spot matching word endings that sound the same",
+    icon: "🌈",
+    skill: "Word families & rhyming patterns",
+    description: "See how words share the same ending family, making them easy to read.",
     questions: [
-      { prompt: "‘The dog runs.’ Who is running?", picture: "🐕", pictureLabel: "A running dog", choices: ["The dog", "The sun", "The cat"], answer: "The dog", hint: "Look for the naming words in the sentence." },
-      { prompt: "I drink from a …", picture: "🥤", pictureLabel: "A cup", choices: ["cup", "sock", "book"], answer: "cup", hint: "Which object can hold a drink?" },
-      { prompt: "Put the words in order: ‘is / It / sunny’", picture: "🌞", pictureLabel: "Sunny weather", choices: ["It is sunny", "Sunny it is?", "Is sunny it"], answer: "It is sunny", hint: "Start with who or what the sentence is about." },
-      { prompt: "Mia has a red ball. What colour is the ball?", picture: "🔴", pictureLabel: "Red", choices: ["Blue", "Red", "Green"], answer: "Red", hint: "Find the colour word in the sentence." },
-      { prompt: "Which sentence makes sense?", picture: "🐦", pictureLabel: "A bird", choices: ["Birds can fly.", "Fly can birds the.", "Birds the can."], answer: "Birds can fly.", hint: "A sentence needs words in an order that makes sense." },
-    ],
+      {
+        prompt: "Which word rhymes with Cat in the -at family?",
+        picture: "🦇",
+        pictureLabel: "Bat",
+        choices: ["Bat", "Dog", "Sun"],
+        answer: "Bat",
+        hint: "Cat and Bat both end in -at! 🐱🦇",
+        family: "-at",
+        soundExamples: [
+          { label: "cat", word: "cat" },
+          { label: "bat", word: "bat" },
+          { label: "hat", word: "hat" }
+        ]
+      },
+      {
+        prompt: "Sun is in the -un family. Which word rhymes with Sun?",
+        picture: "🏃",
+        pictureLabel: "Run",
+        choices: ["Run", "Map", "Bed"],
+        answer: "Run",
+        hint: "Sun and Run have the same happy -un ending! ☀️🏃",
+        family: "-un",
+        soundExamples: [
+          { label: "sun", word: "sun" },
+          { label: "run", word: "run" },
+          { label: "fun", word: "fun" }
+        ]
+      },
+      {
+        prompt: "Dog belongs to the -og family. What rhymes with Dog?",
+        picture: "🐸",
+        pictureLabel: "Frog",
+        choices: ["Frog", "Fish", "Pig"],
+        answer: "Frog",
+        hint: "Dog and Frog both end in -og! 🐶🐸",
+        family: "-og",
+        soundExamples: [
+          { label: "dog", word: "dog" },
+          { label: "frog", word: "frog" },
+          { label: "log", word: "log" }
+        ]
+      },
+      {
+        prompt: "Bug is in the -ug family. What rhymes with Bug?",
+        picture: "☕",
+        pictureLabel: "Mug",
+        choices: ["Mug", "Cat", "Sun"],
+        answer: "Mug",
+        hint: "Bug and Mug end in -ug! 🐞☕",
+        family: "-ug",
+        soundExamples: [
+          { label: "bug", word: "bug" },
+          { label: "mug", word: "mug" },
+          { label: "hug", word: "hug" }
+        ]
+      },
+      {
+        prompt: "Hop rhymes with which word in the -op family?",
+        picture: "🧹",
+        pictureLabel: "Mop",
+        choices: ["Mop", "Car", "Tree"],
+        answer: "Mop",
+        hint: "Hop and Mop both share the bouncy -op sound! 🐰🧹",
+        family: "-op",
+        soundExamples: [
+          { label: "hop", word: "hop" },
+          { label: "mop", word: "mop" },
+          { label: "top", word: "top" }
+        ]
+      }
+    ]
   },
+
+  // -------------------------------------------------------
+  // LEVEL 5: Combination Word Builders (Compound Words)
+  // Combining small friendly words into big exciting words!
+  // e.g. Honey + Bee = Honeybee 🍯🐝
+  // -------------------------------------------------------
   {
     id: 5,
-    title: "Tiny Story Readers",
-    subtitle: "Read a little story and find clues",
-    icon: "📚",
-    skill: "Story understanding",
-    description: "Use story details to answer questions.",
+    title: "Combination Word Builders",
+    subtitle: "Join two small words to create an exciting new word!",
+    icon: "🍯",
+    skill: "Compound words & morphemic awareness",
+    description: "Tap the two words to hear them combine into one big, friendly word!",
     questions: [
-      { prompt: "Ava planted a seed. What did Ava plant?", picture: "🌱", pictureLabel: "A growing seed", choices: ["A seed", "A stone", "A toy"], answer: "A seed", hint: "The answer is in the first sentence." },
-      { prompt: "Why did the plant grow? Ava watered it each day.", picture: "💧", pictureLabel: "Watering a plant", choices: ["It got water", "It ate lunch", "It wore a hat"], answer: "It got water", hint: "Look for what Ava did each day." },
-      { prompt: "Ben put on a coat and opened his umbrella. What might the weather be like?", picture: "🌧️", pictureLabel: "Rainy weather", choices: ["Rainy", "Very hot", "Very quiet"], answer: "Rainy", hint: "An umbrella is often used when it rains." },
-      { prompt: "The rabbit shared its carrot with a friend. What does this show?", picture: "🐰", pictureLabel: "A rabbit sharing a carrot", choices: ["Kindness", "Anger", "Sleepiness"], answer: "Kindness", hint: "Think about how sharing helps a friend feel." },
-      { prompt: "What is a good title for a story about a lost puppy finding home?", picture: "🐶", pictureLabel: "A puppy", choices: ["The Lost Puppy", "A Blue Pencil", "Lunch Time"], answer: "The Lost Puppy", hint: "A title tells us what the story is mostly about." },
-    ],
+      {
+        type: "compound",
+        prompt: "Join Honey + Bee together! What word do they make?",
+        picture: "🍯🐝",
+        pictureLabel: "Honey + Bee",
+        part1: "Honey",
+        emoji1: "🍯",
+        part2: "Bee",
+        emoji2: "🐝",
+        combined: "Honeybee",
+        choices: ["Honeybee", "Sunbee", "Honeycat"],
+        answer: "Honeybee",
+        hint: "Sweet Honey 🍯 plus busy Bee 🐝 makes Honeybee! 🍯🐝",
+        soundExamples: [
+          { label: "Honey", word: "honey" },
+          { label: "Bee", word: "bee" },
+          { label: "Honeybee", word: "honeybee" }
+        ]
+      },
+      {
+        type: "compound",
+        prompt: "Join Rain + Bow together! What colorful surprise is made?",
+        picture: "🌧️🌈",
+        pictureLabel: "Rain + Bow",
+        part1: "Rain",
+        emoji1: "🌧️",
+        part2: "Bow",
+        emoji2: "🌈",
+        combined: "Rainbow",
+        choices: ["Rainbow", "Raindrop", "Sunbow"],
+        answer: "Rainbow",
+        hint: "Rain 🌧️ plus Bow 🌈 creates a beautiful Rainbow in the sky! 🌈",
+        soundExamples: [
+          { label: "Rain", word: "rain" },
+          { label: "Bow", word: "bow" },
+          { label: "Rainbow", word: "rainbow" }
+        ]
+      },
+      {
+        type: "compound",
+        prompt: "Put Sun + Flower together! What happy plant grows?",
+        picture: "☀️🌻",
+        pictureLabel: "Sun + Flower",
+        part1: "Sun",
+        emoji1: "☀️",
+        part2: "Flower",
+        emoji2: "🌻",
+        combined: "Sunflower",
+        choices: ["Sunflower", "Sunrain", "Moonflower"],
+        answer: "Sunflower",
+        hint: "Warm Sun ☀️ plus Flower 🌻 gives us a tall Sunflower! 🌻",
+        soundExamples: [
+          { label: "Sun", word: "sun" },
+          { label: "Flower", word: "flower" },
+          { label: "Sunflower", word: "sunflower" }
+        ]
+      },
+      {
+        type: "compound",
+        prompt: "Join Star + Fish together! What ocean friend is this?",
+        picture: "⭐🐟",
+        pictureLabel: "Star + Fish",
+        part1: "Star",
+        emoji1: "⭐",
+        part2: "Fish",
+        emoji2: "🐟",
+        combined: "Starfish",
+        choices: ["Starfish", "Goldfish", "Jellyfish"],
+        answer: "Starfish",
+        hint: "Star ⭐ plus Fish 🐟 makes a sea Starfish! ⭐🐟",
+        soundExamples: [
+          { label: "Star", word: "star" },
+          { label: "Fish", word: "fish" },
+          { label: "Starfish", word: "starfish" }
+        ]
+      },
+      {
+        type: "compound",
+        prompt: "Combine Butter + Fly! What fluttering friend appears?",
+        picture: "🧈🦋",
+        pictureLabel: "Butter + Fly",
+        part1: "Butter",
+        emoji1: "🧈",
+        part2: "Fly",
+        emoji2: "🪰",
+        combined: "Butterfly",
+        choices: ["Butterfly", "Dragonfly", "Firefly"],
+        answer: "Butterfly",
+        hint: "Butter 🧈 plus Fly 🪰 makes a colorful Butterfly! 🦋",
+        soundExamples: [
+          { label: "Butter", word: "butter" },
+          { label: "Fly", word: "fly" },
+          { label: "Butterfly", word: "butterfly" }
+        ]
+      },
+      {
+        type: "compound",
+        prompt: "Join Cup + Cake together! What yummy sweet treat is it?",
+        picture: "🥤🎂",
+        pictureLabel: "Cup + Cake",
+        part1: "Cup",
+        emoji1: "🥤",
+        part2: "Cake",
+        emoji2: "🎂",
+        combined: "Cupcake",
+        choices: ["Cupcake", "Pancake", "Cheesecake"],
+        answer: "Cupcake",
+        hint: "A tiny Cake baked in a Cup is a Cupcake! 🧁",
+        soundExamples: [
+          { label: "Cup", word: "cup" },
+          { label: "Cake", word: "cake" },
+          { label: "Cupcake", word: "cupcake" }
+        ]
+      },
+      {
+        type: "compound",
+        prompt: "Join Snow + Man together on a cold winter day!",
+        picture: "❄️⛄",
+        pictureLabel: "Snow + Man",
+        part1: "Snow",
+        emoji1: "❄️",
+        part2: "Man",
+        emoji2: "⛄",
+        combined: "Snowman",
+        choices: ["Snowman", "Rainman", "Iceman"],
+        answer: "Snowman",
+        hint: "Fluffy Snow ❄️ rolled together makes a cheerful Snowman! ⛄",
+        soundExamples: [
+          { label: "Snow", word: "snow" },
+          { label: "Man", word: "man" },
+          { label: "Snowman", word: "snowman" }
+        ]
+      },
+      {
+        type: "compound",
+        prompt: "Combine Sand + Castle at the sunny beach!",
+        picture: "🏖️🏰",
+        pictureLabel: "Sand + Castle",
+        part1: "Sand",
+        emoji1: "🏖️",
+        part2: "Castle",
+        emoji2: "🏰",
+        combined: "Sandcastle",
+        choices: ["Sandcastle", "Sandhouse", "Beachhouse"],
+        answer: "Sandcastle",
+        hint: "Building in the Sand 🏖️ creates a magnificent Sandcastle! 🏰",
+        soundExamples: [
+          { label: "Sand", word: "sand" },
+          { label: "Castle", word: "castle" },
+          { label: "Sandcastle", word: "sandcastle" }
+        ]
+      }
+    ]
   },
+
+  // -------------------------------------------------------
+  // LEVEL 6: Sentence Reading Explorers
+  // Short, dyslexia-spaced sentences with visual picture clues.
+  // -------------------------------------------------------
   {
     id: 6,
-    title: "Story Adventurers",
-    subtitle: "Explore longer words and deeper meaning",
-    icon: "🌟",
-    skill: "Vocabulary and comprehension",
-    description: "Explore meaning, word parts, and story clues.",
+    title: "Sentence Explorers",
+    subtitle: "Read friendly short sentences and uncover story meaning",
+    icon: "📖",
+    skill: "Sentence comprehension with picture anchors",
+    description: "Read short, calm sentences at your own pace with helpful picture clues.",
     questions: [
-      { prompt: "What does ‘enormous’ mean?", picture: "🐳", pictureLabel: "An enormous whale", choices: ["Very big", "Very tiny", "Very quiet"], answer: "Very big", hint: "An enormous whale would be much bigger than a fish." },
-      { prompt: "Which word has two syllables? Clap the parts.", picture: "🐇", pictureLabel: "Rabbit", choices: ["Rabbit", "Cat", "Sun"], answer: "Rabbit", hint: "Clap the parts: rab-bit." },
-      { prompt: "Although it was raining, Noor went outside with boots. What does although tell us?", picture: "🥾", pictureLabel: "Rain boots", choices: ["There is a contrast", "The story is over", "Someone is asking a question"], answer: "There is a contrast", hint: "Noor went outside even though the weather was rainy." },
-      { prompt: "What helps you work out an unfamiliar word in a story?", picture: "🔎", pictureLabel: "A magnifying glass", choices: ["Look at nearby clues and word parts", "Skip every sentence", "Guess without reading"], answer: "Look at nearby clues and word parts", hint: "The sentence and word parts can give useful clues." },
-      { prompt: "A character practises every day and improves. What is a likely message?", picture: "🌻", pictureLabel: "A growing flower", choices: ["Practice can help us grow", "Never try anything new", "Only perfect people can learn"], answer: "Practice can help us grow", hint: "Think about what changed because the character kept trying." },
-    ],
-  },
+      {
+        prompt: "‘The happy cat naps in the sun.’ Where is the cat?",
+        picture: "🐱☀️",
+        pictureLabel: "Cat in the sun",
+        choices: ["In the sun", "In the car", "In a tree"],
+        answer: "In the sun",
+        hint: "Look at the last words: ‘in the sun’. ☀️"
+      },
+      {
+        prompt: "‘The little puppy has a red ball.’ What color is the ball?",
+        picture: "🐶🔴",
+        pictureLabel: "Puppy with a ball",
+        choices: ["Red", "Blue", "Green"],
+        answer: "Red",
+        hint: "The story says: ‘a red ball’. 🔴"
+      },
+      {
+        prompt: "‘A honeybee visits a yellow sunflower.’ Who visits the flower?",
+        picture: "🐝🌻",
+        pictureLabel: "Bee and sunflower",
+        choices: ["A honeybee", "A sleepy frog", "A big whale"],
+        answer: "A honeybee",
+        hint: "Our combination friend from Level 5: a honeybee! 🐝"
+      },
+      {
+        prompt: "‘Ben puts on a yellow raincoat.’ What might the weather be?",
+        picture: "🌧️",
+        pictureLabel: "Rainy day",
+        choices: ["Rainy", "Very hot", "Snowy"],
+        answer: "Rainy",
+        hint: "Raincoats keep us dry when it rains! 🌧️"
+      },
+      {
+        prompt: "‘The rabbit shares a crunchy carrot with a friend.’ What does this show?",
+        picture: "🐰🥕",
+        pictureLabel: "Sharing friend",
+        choices: ["Kindness", "Anger", "Sleepiness"],
+        answer: "Kindness",
+        hint: "Sharing with a friend shows warm kindness! 💚"
+      }
+    ]
+  }
 ];
 
 const defaultState = () => ({
@@ -132,7 +677,7 @@ export function recordStoryCompletion() {
   state.stars += 3;
   state.completedStories += 1;
   state.gardenPoints += 1;
-  addBadge(state, "first-story", "Story Starter", "Finished your first story", "📖");
+  addBadge(state, "first-story", "Story Starter", "Finished your first reading adventure", "📖");
   if (state.completedStories >= 3) {
     addBadge(state, "story-collector", "Story Collector", "Finished three stories", "🦋");
   }
@@ -140,7 +685,7 @@ export function recordStoryCompletion() {
     addBadge(state, "story-explorer", "Story Explorer", "Finished five stories", "🧭");
   }
   if (state.gardenPoints >= 3) {
-    addBadge(state, "garden-grower", "Garden Grower", "Helped your learning garden grow", "🌼");
+    addBadge(state, "garden-grower", "Garden Grower", "Helped your learning garden sprout", "🌼");
   }
   return saveState(state);
 }
@@ -149,52 +694,59 @@ export function recordPracticeSession(levelId, correct, total) {
   const state = getLearningState();
   const accuracy = total ? Math.round((correct / total) * 100) : 0;
   const previous = state.levels[levelId] || { attempts: 0, masterySessions: 0, bestAccuracy: 0, completed: false };
-  const wasMastery = accuracy >= 80;
+  const wasMastery = accuracy >= 75; // Dyslexia-friendly threshold: 75% counts as mastery
+
   const next = {
     ...previous,
     attempts: previous.attempts + 1,
     masterySessions: previous.masterySessions + (wasMastery ? 1 : 0),
     bestAccuracy: Math.max(previous.bestAccuracy, accuracy),
-    completed: previous.completed || (previous.masterySessions + (wasMastery ? 1 : 0) >= 2),
+    completed: previous.completed || (previous.masterySessions + (wasMastery ? 1 : 0) >= 1),
     lastAccuracy: accuracy,
   };
+
   const newlyMastered = !previous.completed && next.completed;
   state.levels[levelId] = next;
   state.completedSessions += 1;
   state.gardenPoints += 1;
-  // Every completed session earns 2 effort stars, plus 1 for each correct answer.
-  // Wrong answers never remove stars; hints and retries are always allowed.
+
+  // Effort stars: 2 stars for participating + 1 for each correct answer
   let starsEarned = correct + 2;
 
-  if (state.completedSessions >= 1) addBadge(state, "first-practice", "Brave Beginner", "Tried your first practice activity", "🌱");
-  if (state.completedSessions >= 5) addBadge(state, "practice-pro", "Practice Pal", "Completed five practice sessions", "💪");
+  if (state.completedSessions >= 1) {
+    addBadge(state, "first-practice", "Brave Explorer", "Started your first practice activity", "🌱");
+  }
+  if (state.completedSessions >= 5) {
+    addBadge(state, "practice-pro", "Reading Pal", "Completed five practice adventures", "💪");
+  }
 
   if (newlyMastered) {
-    addBadge(state, `level-${levelId}`, `${LEARNING_LEVELS[levelId - 1].title} Master`, `Showed strong understanding in ${LEARNING_LEVELS[levelId - 1].title}`, "🏅");
-    // Celebrate mastery at every level, including the final level.
+    const levelTitle = LEARNING_LEVELS[levelId - 1]?.title || `Level ${levelId}`;
+    addBadge(state, `level-${levelId}`, `${levelTitle} Champion`, `Showed understanding in ${levelTitle}`, "🏅");
     starsEarned += 5;
+
     if (levelId < LEARNING_LEVELS.length) {
       state.currentLevel = Math.max(state.currentLevel, levelId + 1);
       addBadge(state, `level-up-${levelId}`, "Level Up!", `Unlocked Level ${levelId + 1}`, "🎉");
     } else {
-      addBadge(state, "reading-adventurer", "Reading Adventurer", "Explored every reading level", "🌟");
+      addBadge(state, "reading-champion", "Master Explorer", "Explored every reading level!", "🌟");
     }
   }
 
   state.stars += starsEarned;
   if (state.stars >= 25) addBadge(state, "star-collector", "Star Collector", "Earned 25 learning stars", "⭐");
-  if (state.gardenPoints >= 3) addBadge(state, "garden-grower", "Garden Grower", "Helped your learning garden grow", "🌼");
-  if (state.gardenPoints >= 7) addBadge(state, "garden-bloomer", "Garden Bloomer", "Grew a flowering learning garden", "🌷");
-  if (state.gardenPoints >= 12) addBadge(state, "garden-champion", "Garden Champion", "Grew a blooming learning garden", "🌻");
+  if (state.gardenPoints >= 3) addBadge(state, "garden-grower", "Garden Grower", "Grew your garden taller", "🌼");
+  if (state.gardenPoints >= 7) addBadge(state, "garden-bloomer", "Garden Bloomer", "Filled your garden with flowers", "🌷");
+  if (state.gardenPoints >= 12) addBadge(state, "garden-champion", "Garden Champion", "Full blooming learning garden", "🌻");
 
   saveState(state);
   return { state, accuracy, levelCompleted: next.completed, newlyMastered, unlockedLevel: state.currentLevel, starsEarned };
 }
 
 export function getGardenStage(state = getLearningState()) {
-  if (state.gardenPoints >= 12) return { name: "Blooming Garden", emoji: "🌻🌼🌷", description: "Your garden is full of blooms!" };
-  if (state.gardenPoints >= 7) return { name: "Flowering Garden", emoji: "🌿🌸🌿", description: "Your plants are growing flowers." };
-  if (state.gardenPoints >= 3) return { name: "Growing Garden", emoji: "🌱🌿", description: "Your little plants are getting taller." };
-  if (state.gardenPoints >= 1) return { name: "Little Sprout", emoji: "🌱", description: "You planted your first seed by learning." };
+  if (state.gardenPoints >= 12) return { name: "Blooming Garden", emoji: "🌻🌼🌷", description: "Your garden is full of vibrant blooms!" };
+  if (state.gardenPoints >= 7) return { name: "Flowering Garden", emoji: "🌿🌸🌿", description: "Your plants have beautiful flowers." };
+  if (state.gardenPoints >= 3) return { name: "Growing Garden", emoji: "🌱🌿", description: "Your little plants are growing taller each day." };
+  if (state.gardenPoints >= 1) return { name: "Little Sprout", emoji: "🌱", description: "You planted your first seed by practicing!" };
   return { name: "Your Garden", emoji: "🪴", description: "Complete a story or practice to plant your first seed." };
 }
