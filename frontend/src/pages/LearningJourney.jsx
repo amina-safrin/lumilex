@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -12,31 +12,54 @@ import {
   Trophy,
   Volume2,
   VolumeX,
-  Plus
+  Plus,
+  Flame,
+  Crown,
+  Mic,
+  MicOff,
+  Zap,
+  Heart,
+  Smile,
+  Wand2,
+  Gem
 } from "lucide-react";
 import "./LearningJourney.css";
+
 import {
   getGardenStage,
   getLearningState,
   LEARNING_LEVELS,
   recordPracticeSession
 } from "../utils/learningRewards";
+
 import {
   playSuccessChime,
+  playRetryGentleSound,
   playTapSound,
   playCombineSound,
   playHintSound,
+  playCelebrationFanfare,
+  playGemEarnedSound,
   speakText,
   speakLetterMnemonic,
   speakCompoundWord,
-  speakPhonemeBlend,
   toggleMuteSounds,
   isSoundsMuted
 } from "../utils/childAudio";
 
+import {
+  getErrorTrackerState,
+  recordChildMistake,
+  recordChildSuccess,
+  getTrickyItems,
+  completeLessonSession,
+  getAdaptiveIntensity
+} from "../utils/errorTracker";
+
 export default function LearningJourney() {
   const navigate = useNavigate();
 
+  // Cleanup speech synthesis on unmount
   useEffect(() => {
     return () => {
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -45,7 +68,12 @@ export default function LearningJourney() {
     };
   }, []);
 
+  // =========================================================
+  // STATE
+  // =========================================================
   const [learningState, setLearningState] = useState(() => getLearningState());
+  const [errorTracker, setErrorTracker] = useState(() => getErrorTrackerState());
+
   const [activeLevel, setActiveLevel] = useState(null);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState("");
@@ -56,7 +84,21 @@ export default function LearningJourney() {
   const [isMuted, setIsMuted] = useState(() => isSoundsMuted());
   const [combinedSuccess, setCombinedSuccess] = useState(false);
 
+  // Voice recording state in lessons
+  const [isVoiceListening, setIsVoiceListening] = useState(false);
+  const [voiceHeardText, setVoiceHeardText] = useState("");
+  const [voiceFeedback, setVoiceFeedback] = useState("");
+
+  // Targeted Error Review Round
+  const [isReviewRound, setIsReviewRound] = useState(false);
+  const [mistakesInCurrentLesson, setMistakesInCurrentLesson] = useState([]);
+  const [reviewIndex, setReviewIndex] = useState(0);
+
+  const speechRecognitionRef = useRef(null);
+
   const garden = useMemo(() => getGardenStage(learningState), [learningState]);
+  const trickyItems = useMemo(() => getTrickyItems(), [errorTracker]);
+  const currentIntensity = useMemo(() => getAdaptiveIntensity(errorTracker), [errorTracker]);
 
   const handleToggleMute = () => {
     const muted = toggleMuteSounds();
@@ -66,25 +108,48 @@ export default function LearningJourney() {
     }
   };
 
-  const startLevel = (level) => {
-    setActiveLevel(level);
+  // =========================================================
+  // START LESSON
+  // =========================================================
+  const startLevel = (level, isReviewMode = false, reviewItemsList = null) => {
+    if (isReviewMode && reviewItemsList && reviewItemsList.length > 0) {
+      setIsReviewRound(true);
+      setActiveLevel({
+        id: 99,
+        title: "Tricky Friends Practice",
+        subtitle: "Conquer the friendly sounds that challenged you!",
+        icon: "🪄",
+        skill: "Targeted error review & confidence booster",
+        description: "Let's review these tricky friends together. You can do it!",
+        questions: reviewItemsList.map((m) => m.questionData)
+      });
+    } else {
+      setIsReviewRound(false);
+      setActiveLevel(level);
+    }
+
     setQuestionIndex(0);
     setSelectedAnswer("");
     setAnswers([]);
     setShowHint(false);
     setSessionResult(null);
     setCombinedSuccess(false);
+    setMistakesInCurrentLesson([]);
+    setVoiceHeardText("");
+    setVoiceFeedback("");
 
-    // Speak cheerful welcome for the level
-    speakText(`Welcome to ${level.title}! Let's have fun reading.`, {
-      onStart: () => setSpeakingText(level.title),
+    speakText(`Let's start! Listen, tap, or speak!`, {
+      onStart: () => setSpeakingText("Starting lesson..."),
       onEnd: () => setSpeakingText("")
     });
   };
 
-  const currentQuestion = activeLevel?.questions[questionIndex];
+  const currentQuestionsList = activeLevel?.questions || [];
+  const currentQuestion = currentQuestionsList[questionIndex];
 
-  // Turn each word in the prompt into an accessible touch-to-hear word
+  // =========================================================
+  // TOUCH & SPEAK WORD
+  // =========================================================
   const renderSpeakableQuestion = (text) =>
     String(text)
       .split(/(\s+)/)
@@ -95,7 +160,7 @@ export default function LearningJourney() {
         return (
           <button
             type="button"
-            className="question-word-button"
+            className="duo-word-pill"
             key={`${index}-${part}`}
             onClick={() => {
               playTapSound();
@@ -112,7 +177,7 @@ export default function LearningJourney() {
         );
       });
 
-  // Tap-to-hear handler for image or word
+  // Handle image or sound tap
   const handleItemAudio = (item) => {
     playTapSound();
     if (!currentQuestion) return;
@@ -146,6 +211,99 @@ export default function LearningJourney() {
     });
   };
 
+  // =========================================================
+  // VOICE READING & CAPTURE IN LESSONS
+  // Child can speak the letter/word into the microphone!
+  // =========================================================
+  const toggleVoiceCapture = () => {
+    if (isVoiceListening) {
+      stopVoiceCapture();
+      return;
+    }
+
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setVoiceFeedback("Voice recognition works best in Chrome or Edge!");
+      return;
+    }
+
+    try {
+      window.speechSynthesis.cancel();
+      playTapSound();
+      setVoiceHeardText("");
+      setVoiceFeedback("Listening... say the word out loud! 🎤");
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 3;
+
+      recognition.onstart = () => {
+        setIsVoiceListening(true);
+      };
+
+      recognition.onresult = (event) => {
+        const spoken = event.results[0][0].transcript.toLowerCase().trim();
+        setVoiceHeardText(spoken);
+        evaluateSpokenWord(spoken);
+      };
+
+      recognition.onerror = (event) => {
+        setIsVoiceListening(false);
+        setVoiceFeedback("Could not hear clearly. Try again or tap an option!");
+      };
+
+      recognition.onend = () => {
+        setIsVoiceListening(false);
+      };
+
+      recognition.start();
+      speechRecognitionRef.current = recognition;
+    } catch (e) {
+      setIsVoiceListening(false);
+      setVoiceFeedback("Please enable microphone permissions.");
+    }
+  };
+
+  const stopVoiceCapture = () => {
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch (e) {}
+      speechRecognitionRef.current = null;
+    }
+    setIsVoiceListening(false);
+  };
+
+  const evaluateSpokenWord = (spoken) => {
+    if (!currentQuestion) return;
+    const cleanSpoken = spoken.toLowerCase().replace(/[.,!?]/g, "").trim();
+    const cleanTarget = String(currentQuestion.answer).toLowerCase().trim();
+    const cleanLabel = String(currentQuestion.pictureLabel || "").toLowerCase().trim();
+
+    // Check if spoken text matches answer or picture label
+    const isMatch =
+      cleanSpoken === cleanTarget ||
+      cleanSpoken === cleanLabel ||
+      cleanSpoken.includes(cleanTarget) ||
+      cleanTarget.includes(cleanSpoken);
+
+    if (isMatch) {
+      playSuccessChime();
+      setVoiceFeedback(`🌟 Fantastic! You said "${spoken}"!`);
+      setSelectedAnswer(currentQuestion.answer);
+      recordChildSuccess(currentQuestion, activeLevel.id);
+      setErrorTracker(getErrorTrackerState());
+    } else {
+      playRetryGentleSound();
+      setVoiceFeedback(`Heard "${spoken}". Let's try once more, or tap below! 💚`);
+      recordChildMistake(currentQuestion, activeLevel.id);
+      setErrorTracker(getErrorTrackerState());
+    }
+  };
+
   // Option selection
   const handleSelectChoice = (choice) => {
     playTapSound();
@@ -168,540 +326,566 @@ export default function LearningJourney() {
     }
   };
 
-  // Submit answer
+  // Submit Answer
   const submitAnswer = () => {
     if (!selectedAnswer || !activeLevel) return;
 
     const isCorrect = selectedAnswer === currentQuestion.answer;
+
     if (isCorrect) {
       playSuccessChime();
+      recordChildSuccess(currentQuestion, activeLevel.id);
+    } else {
+      playRetryGentleSound();
+      recordChildMistake(currentQuestion, activeLevel.id);
+      setMistakesInCurrentLesson((prev) => [...prev, currentQuestion]);
     }
+
+    setErrorTracker(getErrorTrackerState());
 
     const nextAnswers = [...answers, isCorrect];
     setAnswers(nextAnswers);
     setShowHint(false);
     setCombinedSuccess(false);
+    setVoiceHeardText("");
+    setVoiceFeedback("");
 
-    if (questionIndex < activeLevel.questions.length - 1) {
+    if (questionIndex < currentQuestionsList.length - 1) {
       setQuestionIndex(questionIndex + 1);
       setSelectedAnswer("");
       return;
     }
 
+    // Finished all regular questions in lesson
     const correctCount = nextAnswers.filter(Boolean).length;
-    const result = recordPracticeSession(
-      activeLevel.id,
-      correctCount,
-      activeLevel.questions.length
-    );
+    const accuracy = Math.round((correctCount / currentQuestionsList.length) * 100);
 
-    setLearningState(result.state);
-    setSessionResult({
-      ...result,
-      correct: correctCount,
-      total: activeLevel.questions.length
+    const lessonRewardData = completeLessonSession({
+      accuracy,
+      levelId: activeLevel.id,
+      mistakesCount: mistakesInCurrentLesson.length + (isCorrect ? 0 : 1)
     });
 
-    if (result.levelCompleted) {
-      playSuccessChime();
-      speakText("Wonderful job! You mastered this level!");
+    const rewardResult = recordPracticeSession(
+      activeLevel.id,
+      correctCount,
+      currentQuestionsList.length
+    );
+
+    setLearningState(rewardResult.state);
+    setErrorTracker(getErrorTrackerState());
+
+    setSessionResult({
+      ...rewardResult,
+      correct: correctCount,
+      total: currentQuestionsList.length,
+      accuracy,
+      isPerfect: lessonRewardData.isPerfect,
+      gemsEarned: lessonRewardData.gemsEarned,
+      streakDays: lessonRewardData.streakDays,
+      intensity: lessonRewardData.intensity
+    });
+
+    if (lessonRewardData.isPerfect) {
+      playCelebrationFanfare();
+      playGemEarnedSound();
+      speakText("Perfect lesson! You earned a golden crown!");
+    } else if (rewardResult.levelCompleted) {
+      playCelebrationFanfare();
+      speakText("Awesome work! You passed this level!");
     }
   };
 
   const closePractice = () => {
+    stopVoiceCapture();
     setActiveLevel(null);
     setSessionResult(null);
     setCombinedSuccess(false);
+    setIsReviewRound(false);
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
   };
 
   return (
-    <div className="learning-page dyslexia-friendly-theme">
+    <div className="learning-page duolingo-theme">
       {/* ===================================================
-          TOPBAR
+          DUOLINGO TOPBAR (STREAK, GEMS, STARS, SOUND)
       =================================================== */}
-      <header className="learning-topbar">
-        <button className="learning-back" onClick={() => navigate("/dashboard")}>
-          <ArrowLeft size={17} /> Dashboard
+      <header className="duo-topbar">
+        <button className="duo-back-btn" onClick={() => navigate("/dashboard")}>
+          <ArrowLeft size={18} /> <span>Dashboard</span>
         </button>
 
-        <div className="learning-brand">
-          <span>📚</span> LumiLex <small>DYSLEXIA READING PATH</small>
-        </div>
+        <div className="duo-stats-row">
+          {/* STREAK */}
+          <div className="duo-stat-pill streak" title="Daily Reading Streak">
+            <Flame size={18} fill="#ff7a00" color="#ff7a00" />
+            <span>{errorTracker.streakDays} Day</span>
+          </div>
 
-        <div className="topbar-actions">
+          {/* GEMS */}
+          <div className="duo-stat-pill gems" title="Star Crystals">
+            <Gem size={17} fill="#1cb0f6" color="#1cb0f6" />
+            <span>{errorTracker.gems}</span>
+          </div>
+
+          {/* STARS */}
+          <div className="duo-stat-pill stars" title="Learning Stars">
+            <Star size={17} fill="#ffc800" color="#ffc800" />
+            <span>{learningState.stars}</span>
+          </div>
+
+          {/* CROWNS */}
+          <div className="duo-stat-pill crowns" title="Perfect Lesson Crowns">
+            <Crown size={17} fill="#e5a100" color="#e5a100" />
+            <span>{errorTracker.perfectLessonsCount}</span>
+          </div>
+
+          {/* SOUND TOGGLE */}
           <button
             type="button"
-            className="sound-toggle-btn"
+            className="duo-sound-btn"
             onClick={handleToggleMute}
             title={isMuted ? "Unmute sounds" : "Mute sounds"}
             aria-label={isMuted ? "Unmute sounds" : "Mute sounds"}
           >
-            {isMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}
-            <span>{isMuted ? "Muted" : "Sound"}</span>
+            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
-
-          <div className="learning-star-count">
-            <Star size={17} fill="currentColor" /> {learningState.stars} stars
-          </div>
         </div>
       </header>
 
       {/* ===================================================
-          MAIN CONTENT
+          MAIN CONTENT AREA
       =================================================== */}
-      <main className="learning-main">
+      <main className="duo-main-container">
         {!activeLevel ? (
           <>
-            {/* HERO PANEL */}
-            <section className="learning-hero">
-              <div>
-                <span className="learning-eyebrow">
-                  <Sparkles size={14} /> ADAPTIVE READING PATH FOR DYSLEXIA
-                </span>
-                <h1>Every little step builds reading confidence.</h1>
-                <p>
-                  No rush, no timers, no penalties. Explore friendly letters with memorable images,
-                  phonics sounds, and playful combination words designed for dyslexic minds.
-                </p>
-                <div className="learning-hero-pills">
-                  <span>⭐ {learningState.stars} stars earned</span>
-                  <span>🏅 {learningState.badges.length} badges</span>
-                  <span>🌱 {learningState.gardenPoints} garden points</span>
+            {/* HERO BANNER */}
+            <section className="duo-hero-card">
+              <div className="hero-content">
+                <div className="intensity-badge">
+                  <Zap size={14} />{" "}
+                  <span>
+                    Intensity:{" "}
+                    <strong>{currentIntensity.toUpperCase()}</strong>
+                  </span>
                 </div>
+                <h1>Your Dyslexia Reading Quest</h1>
+                <p>
+                  Level by level, sound by sound. Earn crowns, unlock new word powers,
+                  and turn tricky letters into lifelong friends!
+                </p>
+
+                {/* TARGETED REVIEW CALLOUT (IF ERRORS DETECTED) */}
+                {trickyItems.length > 0 && (
+                  <div className="tricky-friends-banner">
+                    <div className="tricky-banner-text">
+                      <Wand2 size={22} className="magic-wand-icon" />
+                      <div>
+                        <strong>
+                          🪄 {trickyItems.length} Tricky{" "}
+                          {trickyItems.length === 1 ? "Friend" : "Friends"} Waiting!
+                        </strong>
+                        <p>
+                          Practice sessions tailored to the exact letters and sounds that tripped you up.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      className="tricky-start-btn"
+                      onClick={() => startLevel(null, true, trickyItems)}
+                    >
+                      Play Review Game ✨
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="learning-hero-art" aria-label="A friendly growing plant">
-                🌱<span>✨</span><i>🌼</i>
+
+              <div className="duo-hero-mascot">
+                <div className="mascot-avatar">🌱</div>
+                <div className="mascot-speech-bubble">
+                  <span>Ready to read? Let's hop on the path!</span>
+                </div>
               </div>
             </section>
 
-            {/* GARDEN PANEL */}
-            <section className="garden-panel">
-              <div className="garden-art">{garden.emoji}</div>
-              <div className="garden-copy">
-                <span className="learning-eyebrow">YOUR LEARNING GARDEN</span>
-                <h2>{garden.name}</h2>
-                <p>
-                  {garden.description} Every story you read and practice activity you try adds sunshine and water to your garden.
-                </p>
-                <div className="garden-progress">
-                  <span
+            {/* DUOLINGO STEPPING STONES PATH */}
+            <section className="duo-learning-path">
+              <div className="path-title">
+                <h2>Reading Adventure Path</h2>
+                <p>Tap a stepping stone to begin your lesson</p>
+              </div>
+
+              <div className="stepping-stones-container">
+                {LEARNING_LEVELS.map((level, index) => {
+                  const progress = learningState.levels[level.id] || {};
+                  const unlocked = level.id <= learningState.currentLevel;
+                  const mastered = Boolean(progress.completed);
+                  // Alternating winding offset for Duolingo serpentine effect
+                  const offsetClasses = ["offset-center", "offset-left", "offset-right"];
+                  const pathOffset = offsetClasses[index % 3];
+
+                  return (
+                    <div
+                      key={level.id}
+                      className={`stepping-stone-node ${pathOffset} ${
+                        unlocked ? "unlocked" : "locked"
+                      } ${mastered ? "mastered" : ""}`}
+                    >
+                      <button
+                        className="stone-circle-btn"
+                        disabled={!unlocked}
+                        onClick={() => startLevel(level)}
+                        title={unlocked ? level.title : "Locked level"}
+                      >
+                        <span className="stone-emoji">{level.icon}</span>
+                        {mastered && (
+                          <div className="mastered-crown-badge">
+                            <Crown size={14} fill="#fff" />
+                          </div>
+                        )}
+                        {!unlocked && (
+                          <div className="locked-badge">
+                            <LockKeyhole size={16} />
+                          </div>
+                        )}
+                      </button>
+
+                      <div className="stone-info-box">
+                        <span className="stone-level-number">
+                          LEVEL {level.id}
+                        </span>
+                        <strong>{level.title}</strong>
+                        <small>{level.subtitle}</small>
+                      </div>
+
+                      {/* Connecting winding dotted bridge */}
+                      {index < LEARNING_LEVELS.length - 1 && (
+                        <div className="path-bridge-line">
+                          <span></span>
+                          <span></span>
+                          <span></span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* LEARNING GARDEN SHOWCASE */}
+            <section className="duo-garden-card">
+              <div className="garden-visual">{garden.emoji}</div>
+              <div className="garden-details">
+                <span className="garden-eyebrow">YOUR GROWING GARDEN</span>
+                <h3>{garden.name}</h3>
+                <p>{garden.description}</p>
+                <div className="duo-progress-bar">
+                  <div
+                    className="duo-progress-fill"
                     style={{
                       width: `${Math.min(
                         100,
                         ((learningState.gardenPoints % 3) / 3) * 100 ||
                           (learningState.gardenPoints ? 100 : 0)
-                      )}%`,
+                      )}%`
                     }}
                   />
                 </div>
-                <small>
-                  {learningState.gardenPoints} learning {learningState.gardenPoints === 1 ? "moment" : "moments"} planted
-                </small>
               </div>
-            </section>
-
-            {/* LEVEL LIST HEADER */}
-            <div className="learning-section-title">
-              <div>
-                <span className="learning-eyebrow">STEP-BY-STEP PROGRESSION</span>
-                <h2>Your Phonics & Word Levels</h2>
-                <p>Designed step-by-step: Letters with Images $\rightarrow$ Sounds $\rightarrow$ Blends $\rightarrow$ Rhymes $\rightarrow$ Combination Words.</p>
-              </div>
-              <div className="mastery-note">
-                Practice at your own speed! Master a level with 75% or more to open the next adventure.
-              </div>
-            </div>
-
-            {/* LEVEL CARDS */}
-            <section className="level-list">
-              {LEARNING_LEVELS.map((level) => {
-                const progress = learningState.levels[level.id] || {};
-                const unlocked = level.id <= learningState.currentLevel;
-                const mastered = Boolean(progress.completed);
-
-                return (
-                  <article
-                    key={level.id}
-                    className={`level-card ${unlocked ? "unlocked" : "locked"} ${
-                      mastered ? "mastered" : ""
-                    }`}
-                  >
-                    <div className="level-icon">
-                      {unlocked ? level.icon : <LockKeyhole size={25} />}
-                    </div>
-                    <div className="level-info">
-                      <div className="level-kicker">
-                        LEVEL {level.id}{" "}
-                        {mastered && (
-                          <span className="mastered-tag">
-                            <Check size={12} /> MASTERED
-                          </span>
-                        )}
-                      </div>
-                      <h3>{level.title}</h3>
-                      <p>{level.subtitle}</p>
-                      <small>
-                        {level.skill} · {progress.attempts || 0} practice{" "}
-                        {progress.attempts === 1 ? "session" : "sessions"}
-                        {progress.bestAccuracy !== undefined
-                          ? ` · Best ${progress.bestAccuracy}%`
-                          : ""}
-                      </small>
-                    </div>
-                    <button
-                      className="level-action"
-                      disabled={!unlocked}
-                      onClick={() => startLevel(level)}
-                    >
-                      {unlocked
-                        ? mastered
-                          ? "Practise again"
-                          : "Start practice"
-                        : "Locked"}
-                      {unlocked ? (
-                        <ArrowRight size={16} />
-                      ) : (
-                        <LockKeyhole size={15} />
-                      )}
-                    </button>
-                  </article>
-                );
-              })}
-            </section>
-
-            {/* BADGES */}
-            <section className="badge-panel">
-              <div className="badge-panel-heading">
-                <Trophy size={21} />
-                <div>
-                  <h2>Your Badges</h2>
-                  <p>Every milestone celebrated along your reading path.</p>
-                </div>
-              </div>
-              {learningState.badges.length ? (
-                <div className="badge-grid">
-                  {learningState.badges.map((badge) => (
-                    <div className="badge-item" key={badge.id}>
-                      <span>{badge.icon}</span>
-                      <div>
-                        <strong>{badge.title}</strong>
-                        <small>{badge.description}</small>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-badges">
-                  <span>🏅</span>
-                  <p>Your first badge is waiting! Complete your first practice to earn it.</p>
-                </div>
-              )}
             </section>
           </>
         ) : (
-          /* =================================================
-              ACTIVE PRACTICE PANEL
-          ================================================= */
-          <section className="practice-panel">
-            <button className="learning-back" onClick={closePractice}>
-              <ArrowLeft size={17} /> All levels
-            </button>
+          /* ===================================================
+              DUOLINGO ACTIVE LESSON RUNNER
+          =================================================== */
+          <section className="duo-lesson-card">
+            {/* LESSON TOP BAR */}
+            <div className="lesson-runner-header">
+              <button className="lesson-close-btn" onClick={closePractice}>
+                ✕
+              </button>
+
+              <div className="lesson-progress-track">
+                <div
+                  className="lesson-progress-fill"
+                  style={{
+                    width: `${
+                      ((questionIndex + 1) / currentQuestionsList.length) * 100
+                    }%`
+                  }}
+                />
+              </div>
+
+              <div className="lesson-heart-badge">
+                <Heart size={18} fill="#ff4b4b" color="#ff4b4b" />
+                <span>Practice</span>
+              </div>
+            </div>
 
             {!sessionResult ? (
-              <>
-                <div className="practice-heading">
-                  <span className="level-icon large">{activeLevel.icon}</span>
-                  <span className="learning-eyebrow">
-                    LEVEL {activeLevel.id} · {activeLevel.skill.toUpperCase()}
+              <div className="lesson-body">
+                {/* QUESTION TITLE & PROMPT */}
+                <div className="lesson-question-header">
+                  <span className="lesson-badge">
+                    {activeLevel.icon} {activeLevel.title}
                   </span>
-                  <h1>{activeLevel.title}</h1>
-                  <p>{activeLevel.description}</p>
-                </div>
-
-                <div className="question-progress">
-                  <div>
-                    <span>
-                      Question {questionIndex + 1} of {activeLevel.questions.length}
-                    </span>
-                    <strong>
-                      {Math.round(
-                        (questionIndex / activeLevel.questions.length) * 100
-                      )}
-                      %
-                    </strong>
-                  </div>
-                  <div className="garden-progress">
-                    <span
-                      style={{
-                        width: `${
-                          ((questionIndex + 1) / activeLevel.questions.length) * 100
-                        }%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="question-card">
-                  {/* SPEAKABLE PROMPT */}
                   <h2 className="speakable-question">
                     {renderSpeakableQuestion(currentQuestion.prompt)}
                   </h2>
+                </div>
 
-                  {/* SPECIAL LEVEL 5: COMBINATION WORD VISUALIZER (honey + bee = honeybee) */}
-                  {currentQuestion.type === "compound" ? (
-                    <div className="compound-word-builder" aria-label="Combination Word Builder">
-                      <div className="compound-cards-row">
-                        <button
-                          type="button"
-                          className="compound-part-card"
-                          onClick={() => {
-                            playTapSound();
-                            speakText(currentQuestion.part1);
-                            setSpeakingText(currentQuestion.part1);
-                          }}
-                          aria-label={`Hear ${currentQuestion.part1}`}
-                        >
-                          <span className="part-emoji">{currentQuestion.emoji1}</span>
-                          <span className="part-text">{currentQuestion.part1}</span>
-                          <span className="part-hint"><Volume2 size={14} /> Hear</span>
-                        </button>
+                {/* VOICE READING OPTION */}
+                <div className="voice-reading-bar">
+                  <button
+                    type="button"
+                    className={`duo-mic-btn ${isVoiceListening ? "listening" : ""}`}
+                    onClick={toggleVoiceCapture}
+                  >
+                    {isVoiceListening ? <MicOff size={18} /> : <Mic size={18} />}
+                    <span>
+                      {isVoiceListening
+                        ? "Listening... Tap to stop"
+                        : "🎤 Say it with your voice!"}
+                    </span>
+                  </button>
 
-                        <div className="compound-plus-icon" aria-hidden="true">
-                          <Plus size={26} />
-                        </div>
+                  {voiceFeedback && (
+                    <div className="voice-feedback-pill">
+                      {voiceFeedback}
+                    </div>
+                  )}
+                </div>
 
-                        <button
-                          type="button"
-                          className="compound-part-card"
-                          onClick={() => {
-                            playTapSound();
-                            speakText(currentQuestion.part2);
-                            setSpeakingText(currentQuestion.part2);
-                          }}
-                          aria-label={`Hear ${currentQuestion.part2}`}
-                        >
-                          <span className="part-emoji">{currentQuestion.emoji2}</span>
-                          <span className="part-text">{currentQuestion.part2}</span>
-                          <span className="part-hint"><Volume2 size={14} /> Hear</span>
-                        </button>
+                {/* SPECIAL LEVEL 5: COMBINATION WORD VISUALIZER */}
+                {currentQuestion.type === "compound" ? (
+                  <div className="compound-word-builder" aria-label="Combination Word Builder">
+                    <div className="compound-cards-row">
+                      <button
+                        type="button"
+                        className="compound-part-card"
+                        onClick={() => {
+                          playTapSound();
+                          speakText(currentQuestion.part1);
+                          setSpeakingText(currentQuestion.part1);
+                        }}
+                        aria-label={`Hear ${currentQuestion.part1}`}
+                      >
+                        <span className="part-emoji">{currentQuestion.emoji1}</span>
+                        <span className="part-text">{currentQuestion.part1}</span>
+                        <span className="part-hint"><Volume2 size={14} /> Hear</span>
+                      </button>
 
-                        <div className="compound-equals-sign" aria-hidden="true">
-                          =
-                        </div>
-
-                        <div
-                          className={`compound-result-card ${
-                            combinedSuccess ? "combined" : "waiting"
-                          }`}
-                        >
-                          <span className="part-emoji">
-                            {combinedSuccess
-                              ? currentQuestion.picture
-                              : "✨"}
-                          </span>
-                          <span className="part-text">
-                            {selectedAnswer || "?"}
-                          </span>
-                          <span className="part-hint">
-                            {selectedAnswer ? "Together!" : "Choose below"}
-                          </span>
-                        </div>
+                      <div className="compound-plus-icon" aria-hidden="true">
+                        <Plus size={26} />
                       </div>
 
-                      <p className="compound-instruction">
-                        Tap each word to hear its sound, then select the new combination word below!
-                      </p>
-                    </div>
-                  ) : (
-                    /* REGULAR PICTURE ANCHOR (Level 1, 2, 3, 4, 6) */
-                    currentQuestion.picture && (
                       <button
                         type="button"
-                        className="question-picture"
-                        onClick={() => handleItemAudio(currentQuestion.pictureLabel)}
-                        aria-label={`Hear ${currentQuestion.pictureLabel || currentQuestion.picture}`}
+                        className="compound-part-card"
+                        onClick={() => {
+                          playTapSound();
+                          speakText(currentQuestion.part2);
+                          setSpeakingText(currentQuestion.part2);
+                        }}
+                        aria-label={`Hear ${currentQuestion.part2}`}
                       >
-                        <span className="question-picture-emoji" aria-hidden="true">
-                          {currentQuestion.picture}
-                        </span>
-                        <span className="question-picture-caption">
-                          {currentQuestion.pictureLabel || "Tap to hear"}
-                        </span>
-                        <span className="question-picture-audio">
-                          <Volume2 size={16} /> Tap to hear
-                        </span>
+                        <span className="part-emoji">{currentQuestion.emoji2}</span>
+                        <span className="part-text">{currentQuestion.part2}</span>
+                        <span className="part-hint"><Volume2 size={14} /> Hear</span>
                       </button>
-                    )
-                  )}
 
-                  <p className="tap-to-hear-note">
-                    <Volume2 size={16} /> Tap any word, picture, or option to hear it spoken clearly.
-                  </p>
+                      <div className="compound-equals-sign" aria-hidden="true">
+                        =
+                      </div>
 
-                  {/* SOUND EXAMPLES (Phonics & Pronunciation) */}
-                  {currentQuestion.soundExamples?.length > 0 && (
-                    <div className="sound-example-row" aria-label="Hear sound examples">
-                      {currentQuestion.soundExamples.map((item) => (
-                        <button
-                          type="button"
-                          key={`${item.label}-${item.word}`}
-                          className="sound-example-button"
-                          onClick={() => {
-                            playTapSound();
-                            speakText(item.word);
-                            setSpeakingText(item.word);
-                          }}
-                          aria-label={`Hear ${item.label} in ${item.word}`}
-                        >
-                          <span className="sound-example-label">{item.label}</span>
-                          <span className="sound-example-word">
-                            <Volume2 size={14} /> {item.word}
-                          </span>
-                        </button>
-                      ))}
+                      <div
+                        className={`compound-result-card ${
+                          combinedSuccess ? "combined" : "waiting"
+                        }`}
+                      >
+                        <span className="part-emoji">
+                          {combinedSuccess ? currentQuestion.picture : "✨"}
+                        </span>
+                        <span className="part-text">
+                          {selectedAnswer || "?"}
+                        </span>
+                        <span className="part-hint">
+                          {selectedAnswer ? "Together!" : "Choose below"}
+                        </span>
+                      </div>
                     </div>
-                  )}
 
-                  {/* ANSWER OPTIONS */}
-                  <div className="answer-options">
-                    {currentQuestion.choices.map((choice) => (
+                    <p className="compound-instruction">
+                      Tap each word to hear its sound, then select the new combination word below!
+                    </p>
+                  </div>
+                ) : (
+                  /* REGULAR PICTURE ANCHOR CARD */
+                  currentQuestion.picture && (
+                    <button
+                      type="button"
+                      className="duo-picture-card"
+                      onClick={() => handleItemAudio(currentQuestion.pictureLabel)}
+                      aria-label={`Hear ${currentQuestion.pictureLabel || currentQuestion.picture}`}
+                    >
+                      <span className="picture-emoji">{currentQuestion.picture}</span>
+                      <div className="picture-text-meta">
+                        <strong>{currentQuestion.pictureLabel || "Tap to hear"}</strong>
+                        <span className="listen-chip">
+                          <Volume2 size={15} /> Tap to hear
+                        </span>
+                      </div>
+                    </button>
+                  )
+                )}
+
+                {/* SOUND EXAMPLES (PURE PHONEMES) */}
+                {currentQuestion.soundExamples?.length > 0 && (
+                  <div className="sound-example-row" aria-label="Hear sound examples">
+                    {currentQuestion.soundExamples.map((item) => (
                       <button
                         type="button"
-                        key={choice}
-                        className={`answer-option ${
-                          selectedAnswer === choice ? "selected" : ""
-                        }`}
-                        onClick={() => handleSelectChoice(choice)}
-                        aria-label={`Hear and choose ${choice}`}
+                        key={`${item.label}-${item.word}`}
+                        className="sound-example-button"
+                        onClick={() => {
+                          playTapSound();
+                          speakText(item.word);
+                          setSpeakingText(item.word);
+                        }}
+                        aria-label={`Hear ${item.label} in ${item.word}`}
                       >
-                        <span>{choice}</span>
-                        <span className="answer-option-actions">
-                          <Volume2 size={17} />
-                          {selectedAnswer === choice && <Check size={17} />}
+                        <span className="sound-example-label">{item.label}</span>
+                        <span className="sound-example-word">
+                          <Volume2 size={14} /> {item.word}
                         </span>
                       </button>
                     ))}
                   </div>
+                )}
 
-                  {/* SPEAKING STATUS */}
-                  {speakingText && (
-                    <div className="audio-status" role="status">
-                      🔊 Saying: <strong>{speakingText}</strong>
-                    </div>
-                  )}
-
-                  {/* HINT */}
-                  {showHint && (
-                    <div className="kind-hint">
-                      💚 Friendly Hint: {currentQuestion.hint}
-                    </div>
-                  )}
-
-                  {/* ACTION BUTTONS */}
-                  <div className="question-actions">
+                {/* ANSWER OPTIONS (DUOLINGO TACTILE 3D BUTTONS) */}
+                <div className="duo-options-grid">
+                  {currentQuestion.choices.map((choice) => (
                     <button
-                      className="hint-button"
-                      onClick={() => {
-                        playHintSound();
-                        setShowHint(!showHint);
-                        if (!showHint) {
-                          speakText(currentQuestion.hint);
-                        }
-                      }}
+                      type="button"
+                      key={choice}
+                      className={`duo-choice-btn ${
+                        selectedAnswer === choice ? "selected" : ""
+                      }`}
+                      onClick={() => handleSelectChoice(choice)}
                     >
-                      💡 Need a gentle hint?
+                      <span className="choice-text">{choice}</span>
+                      <span className="choice-action">
+                        <Volume2 size={18} />
+                        {selectedAnswer === choice && <Check size={18} />}
+                      </span>
                     </button>
+                  ))}
+                </div>
 
-                    <button
-                      className="practice-submit"
-                      disabled={!selectedAnswer}
-                      onClick={submitAnswer}
-                    >
-                      {questionIndex === activeLevel.questions.length - 1
-                        ? "Finish practice"
-                        : "Next question"}
-                      <ArrowRight size={16} />
-                    </button>
+                {/* HINT */}
+                {showHint && (
+                  <div className="duo-hint-box">
+                    💚 Friendly Clue: {currentQuestion.hint}
                   </div>
+                )}
+
+                {/* BOTTOM ACTION BAR */}
+                <div className="duo-bottom-bar">
+                  <button
+                    className="duo-hint-btn"
+                    onClick={() => {
+                      playHintSound();
+                      setShowHint(!showHint);
+                      if (!showHint) speakText(currentQuestion.hint);
+                    }}
+                  >
+                    💡 Need a clue?
+                  </button>
+
+                  <button
+                    className="duo-continue-btn"
+                    disabled={!selectedAnswer}
+                    onClick={submitAnswer}
+                  >
+                    <span>
+                      {questionIndex === currentQuestionsList.length - 1
+                        ? "Finish Lesson"
+                        : "Check & Continue"}
+                    </span>
+                    <ArrowRight size={18} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* ===================================================
+                  LESSON CELEBRATION (PERFECT LESSON REWARD SCREEN)
+              =================================================== */
+              <div className="lesson-result-screen">
+                <div className="celebration-animation">
+                  {sessionResult.isPerfect ? "👑" : "🎉"}
                 </div>
 
-                <p className="practice-reassurance">
-                  🌱 Take all the time you need. Reading gets easier every single time you try.
-                </p>
-              </>
-            ) : (
-              /* =================================================
-                  SESSION RESULTS
-              ================================================= */
-              <div className="session-result">
-                <div className="result-celebration">
-                  {sessionResult.levelCompleted ? "🎉" : "🌱"}
-                </div>
-                <span className="learning-eyebrow">PRACTICE COMPLETE</span>
+                {sessionResult.isPerfect ? (
+                  <div className="perfect-lesson-ribbon">
+                    <Sparkles size={20} />
+                    <span>PERFECT LESSON! 100% ACCURACY!</span>
+                    <Sparkles size={20} />
+                  </div>
+                ) : (
+                  <span className="lesson-complete-tag">LESSON COMPLETE!</span>
+                )}
+
                 <h1>
-                  {sessionResult.levelCompleted
-                    ? "Fantastic Reading!"
-                    : "Proud of your effort!"}
+                  {sessionResult.isPerfect
+                    ? "Flawless Reading Champion!"
+                    : "Fantastic Effort!"}
                 </h1>
                 <p>
-                  {sessionResult.accuracy >= 75
-                    ? "You showed wonderful understanding. Keep going at your own pace!"
-                    : "Every try helps your brain grow. You can practice this level again anytime!"}
+                  {sessionResult.isPerfect
+                    ? "You made zero mistakes and conquered every sound! Here are your bonus rewards."
+                    : "You gave it your best effort! Every lesson strengthens your reading superpowers."}
                 </p>
 
-                <div className="result-stats">
-                  <div>
-                    <strong>
-                      {sessionResult.correct}/{sessionResult.total}
-                    </strong>
-                    <span>answers correct</span>
-                  </div>
-                  <div>
-                    <strong>{sessionResult.accuracy}%</strong>
-                    <span>this session</span>
-                  </div>
-                  <div>
+                {/* REWARD SUMMARY CARDS */}
+                <div className="reward-cards-grid">
+                  <div className="reward-stat-card stars">
+                    <Star size={28} fill="#ffc800" color="#ffc800" />
                     <strong>+{sessionResult.starsEarned}</strong>
-                    <span>stars earned</span>
+                    <span>Stars Earned</span>
+                  </div>
+
+                  <div className="reward-stat-card gems">
+                    <Gem size={28} fill="#1cb0f6" color="#1cb0f6" />
+                    <strong>+{sessionResult.gemsEarned}</strong>
+                    <span>Gems Earned</span>
+                  </div>
+
+                  <div className="reward-stat-card streak">
+                    <Flame size={28} fill="#ff7a00" color="#ff7a00" />
+                    <strong>{sessionResult.streakDays} Day</strong>
+                    <span>Streak 🔥</span>
                   </div>
                 </div>
 
-                {sessionResult.newlyMastered &&
-                  activeLevel.id < LEARNING_LEVELS.length && (
-                    <div className="level-up-banner">
-                      🎊 Level {activeLevel.id + 1} Unlocked! Your next reading adventure is ready.
-                    </div>
-                  )}
-
-                {sessionResult.newlyMastered &&
-                  activeLevel.id === LEARNING_LEVELS.length && (
-                    <div className="level-up-banner">
-                      🏆 You mastered all reading levels! You are an amazing reader.
-                    </div>
-                  )}
-
-                <div className="result-actions">
+                <div className="result-actions-row">
                   <button
-                    className="hint-button"
+                    className="duo-retry-btn"
                     onClick={() => startLevel(activeLevel)}
                   >
-                    <RotateCcw size={16} /> Practise again
+                    <RotateCcw size={17} /> Practice Again
                   </button>
-                  <button className="practice-submit" onClick={closePractice}>
-                    Back to my levels <ArrowRight size={16} />
+
+                  <button className="duo-continue-btn large" onClick={closePractice}>
+                    Continue Quest <ArrowRight size={18} />
                   </button>
                 </div>
               </div>
             )}
           </section>
         )}
-
-        <footer className="learning-footer">
-          <BookOpen size={16} /> LumiLex Dyslexia Companion <span>💚</span> No rush, no stress—just comfortable, joyful reading.
-        </footer>
       </main>
     </div>
   );

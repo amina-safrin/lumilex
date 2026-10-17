@@ -18,6 +18,7 @@ import {
   Star,
 } from "lucide-react";
 import { getLearningState, getGardenStage } from "../utils/learningRewards";
+import { getErrorTrackerState } from "../utils/errorTracker";
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -25,9 +26,13 @@ function Dashboard() {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [rewards, setRewards] = useState(() => getLearningState());
+  const [errorTracker, setErrorTracker] = useState(() => getErrorTrackerState());
 
   useEffect(() => {
-    const refreshRewards = () => setRewards(getLearningState());
+    const refreshRewards = () => {
+      setRewards(getLearningState());
+      setErrorTracker(getErrorTrackerState());
+    };
     window.addEventListener("storage", refreshRewards);
     window.addEventListener("focus", refreshRewards);
     return () => {
@@ -260,57 +265,36 @@ function Dashboard() {
         <section className="dashboard-stats">
 
           {/* STREAK */}
-
           <div className="dashboard-stat">
-
             <div className="stat-symbol">
-              <Flame size={19} />
+              <Flame size={19} color="#ff7a00" />
             </div>
-
             <div>
-              <strong>0 days</strong>
-
-              <span>
-                Reading streak
-              </span>
+              <strong>{errorTracker.streakDays} {errorTracker.streakDays === 1 ? "day" : "days"}</strong>
+              <span>Reading streak</span>
             </div>
-
           </div>
 
-          {/* READING TIME */}
-
+          {/* GEMS */}
           <div className="dashboard-stat">
-
             <div className="stat-symbol">
-              <Clock3 size={19} />
+              <Sparkles size={19} color="#1cb0f6" />
             </div>
-
             <div>
-              <strong>0 min</strong>
-
-              <span>
-                Reading time
-              </span>
+              <strong>{errorTracker.gems} gems</strong>
+              <span>Star crystals</span>
             </div>
-
           </div>
 
-          {/* WEEKLY GOAL */}
-
+          {/* PERFECT LESSON CROWNS */}
           <div className="dashboard-stat">
-
             <div className="stat-symbol">
-              <Target size={19} />
+              <Crown size={19} color="#e5a100" />
             </div>
-
             <div>
-              <strong>Starting</strong>
-
-              <span>
-                Weekly goal
-              </span>
+              <strong>{errorTracker.perfectLessonsCount} {errorTracker.perfectLessonsCount === 1 ? "crown" : "crowns"}</strong>
+              <span>Perfect lessons</span>
             </div>
-
           </div>
 
         </section>
