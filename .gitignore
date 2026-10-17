@@ -5,3 +5,4 @@ whisper/.venv/
 .venv/
 venv/
 .env
+backend/.env
