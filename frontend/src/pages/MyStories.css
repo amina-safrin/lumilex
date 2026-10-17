@@ -1,0 +1,675 @@
+/* ================================
+   MY STORIES PAGE
+================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap');
+
+
+.my-stories-page {
+  min-height: 100vh;
+
+  background: #f5f7f1;
+
+  color: #293b34;
+
+  font-family: "DM Sans", sans-serif;
+
+  padding-bottom: 60px;
+
+  font-synthesis: none;
+
+  text-rendering: optimizeLegibility;
+}
+
+
+/* ================================
+   HEADER
+================================ */
+
+.my-stories-header {
+  min-height: 80px;
+
+  background: white;
+
+  border-bottom: 1px solid #e2e8df;
+
+  display: flex;
+
+  align-items: center;
+
+  padding: 0 50px;
+
+  position: relative;
+}
+
+
+/* ================================
+   BACK BUTTON
+================================ */
+
+.my-stories-back-button {
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  border: none;
+
+  background: transparent;
+
+  color: #667568;
+
+  font-family: "DM Sans", sans-serif;
+
+  font-size: 14px;
+
+  cursor: pointer;
+
+  padding: 10px;
+
+  transition: 0.2s ease;
+}
+
+.my-stories-back-button:hover {
+  color: #405344;
+}
+
+
+/* ================================
+   HEADER TITLE
+================================ */
+
+.my-stories-header-title {
+  position: absolute;
+
+  left: 50%;
+
+  transform: translateX(-50%);
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+}
+
+.my-stories-header-title svg {
+  color: #718a73;
+}
+
+.my-stories-header-title h1 {
+  margin: 0;
+
+  font-family: "Nunito", sans-serif;
+
+  font-size: 23px;
+
+  font-weight: 700;
+
+  color: #304235;
+}
+
+.my-stories-header-title p {
+  margin: 3px 0 0;
+
+  color: #7a887c;
+
+  font-size: 12px;
+}
+
+
+/* ================================
+   NEW STORY BUTTON
+================================ */
+
+.new-story-button {
+  margin-left: auto;
+
+  border: none;
+
+  background: #718a73;
+
+  color: white;
+
+  border-radius: 12px;
+
+  padding: 11px 17px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  cursor: pointer;
+
+  font-family: "DM Sans", sans-serif;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  transition: 0.2s ease;
+}
+
+.new-story-button:hover {
+  background: #617963;
+
+  transform: translateY(-1px);
+}
+
+
+/* ================================
+   INTRO
+================================ */
+
+.my-stories-intro {
+  max-width: 900px;
+
+  margin: 45px auto 30px;
+
+  text-align: center;
+
+  padding: 0 20px;
+}
+
+.my-stories-intro h2 {
+  margin: 0 0 10px;
+
+  font-family: "Nunito", sans-serif;
+
+  font-size: 30px;
+
+  font-weight: 800;
+
+  color: #304235;
+}
+
+.my-stories-intro p {
+  margin: 0;
+
+  color: #758276;
+
+  font-size: 16px;
+
+  line-height: 1.7;
+}
+
+
+/* ================================
+   CONTENT
+================================ */
+
+.my-stories-content {
+  width: 90%;
+
+  max-width: 1100px;
+
+  margin: auto;
+}
+
+
+/* ================================
+   SECTION HEADING
+================================ */
+
+.my-stories-section-heading {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  margin-bottom: 25px;
+}
+
+.my-stories-section-heading h2 {
+  margin: 0 0 5px;
+
+  font-family: "Nunito", sans-serif;
+
+  font-size: 22px;
+
+  font-weight: 700;
+
+  color: #304235;
+}
+
+.my-stories-section-heading p {
+  margin: 0;
+
+  color: #7b887d;
+
+  font-size: 14px;
+}
+
+
+/* ================================
+   STORY COUNT
+================================ */
+
+.story-count {
+  background: #e5eee3;
+
+  color: #607660;
+
+  padding: 7px 12px;
+
+  border-radius: 12px;
+
+  font-size: 12px;
+
+  font-weight: 600;
+}
+
+
+/* ================================
+   STORY GRID
+================================ */
+
+.my-stories-grid {
+  display: grid;
+
+  grid-template-columns: repeat(3, 1fr);
+
+  gap: 20px;
+}
+
+
+/* ================================
+   STORY CARD
+================================ */
+
+.my-story-card {
+  background: #fffdf8;
+
+  border: 1px solid #e1e7df;
+
+  border-radius: 20px;
+
+  padding: 24px;
+
+  cursor: pointer;
+
+  display: flex;
+
+  flex-direction: column;
+
+  min-height: 275px;
+
+  box-shadow:
+    0 5px 18px rgba(49, 67, 54, 0.05);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.my-story-card:hover {
+  transform: translateY(-4px);
+
+  border-color: #c5d1c3;
+
+  box-shadow:
+    0 12px 28px rgba(49, 67, 54, 0.09);
+}
+
+
+/* ================================
+   ICON
+================================ */
+
+.my-story-card-icon {
+  width: 65px;
+
+  height: 65px;
+
+  border-radius: 16px;
+
+  background: #e5eee3;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  font-size: 34px;
+
+  margin-bottom: 17px;
+}
+
+
+/* ================================
+   CONTENT
+================================ */
+
+.my-story-card-content {
+  flex: 1;
+}
+
+.my-story-card-content h3 {
+  margin: 0 0 12px;
+
+  font-family: "Nunito", sans-serif;
+
+  font-size: 18px;
+
+  line-height: 1.4;
+
+  font-weight: 700;
+
+  color: #304235;
+}
+
+
+/* ================================
+   DETAILS
+================================ */
+
+.my-story-details {
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  flex-wrap: wrap;
+
+  margin-bottom: 12px;
+}
+
+.my-story-category,
+.my-story-level {
+  font-size: 11px;
+
+  font-weight: 500;
+
+  padding: 5px 9px;
+
+  border-radius: 10px;
+
+  background: #f0f4ed;
+
+  color: #647365;
+}
+
+.my-story-level {
+  background: #f7f5ea;
+
+  color: #7a7358;
+}
+
+
+/* ================================
+   READING TIME
+================================ */
+
+.my-story-time {
+  display: flex;
+
+  align-items: center;
+
+  gap: 5px;
+
+  color: #859086;
+
+  font-size: 12px;
+}
+
+.my-story-time svg {
+  color: #718a73;
+}
+
+
+/* ================================
+   READ BUTTON
+================================ */
+
+.my-story-read-button {
+  width: 100%;
+
+  border: 1px solid #cbd8c8;
+
+  background: #f8faf7;
+
+  color: #5d735f;
+
+  border-radius: 12px;
+
+  padding: 11px;
+
+  margin-top: 18px;
+
+  font-family: "DM Sans", sans-serif;
+
+  font-size: 13px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+.my-story-read-button:hover {
+  background: #edf3e9;
+
+  border-color: #a9baa9;
+
+  color: #4e725f;
+}
+
+
+/* ================================
+   EMPTY STATE
+================================ */
+
+.my-stories-empty {
+  background: #fffdf8;
+
+  border: 1px solid #e1e7df;
+
+  border-radius: 20px;
+
+  padding: 60px 20px;
+
+  text-align: center;
+
+  color: #7a887c;
+
+  box-shadow:
+    0 5px 18px rgba(49, 67, 54, 0.04);
+}
+
+.my-stories-empty > svg {
+  color: #8da08e;
+
+  margin-bottom: 10px;
+}
+
+.my-stories-empty h3 {
+  margin: 0 0 7px;
+
+  font-family: "Nunito", sans-serif;
+
+  color: #405344;
+
+  font-size: 19px;
+
+  font-weight: 700;
+}
+
+.my-stories-empty p {
+  margin: 0 auto 20px;
+
+  max-width: 450px;
+
+  font-size: 14px;
+
+  line-height: 1.6;
+}
+
+
+/* ================================
+   EMPTY ICON
+================================ */
+
+.empty-story-icon {
+  width: 65px;
+
+  height: 65px;
+
+  border-radius: 17px;
+
+  background: #e5eee3;
+
+  color: #718a73;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  margin: 0 auto 15px;
+}
+
+
+/* ================================
+   EMPTY CREATE BUTTON
+================================ */
+
+.empty-create-button {
+  border: none;
+
+  background: #718a73;
+
+  color: white;
+
+  border-radius: 12px;
+
+  padding: 12px 18px;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  cursor: pointer;
+
+  font-family: "DM Sans", sans-serif;
+
+  font-size: 13px;
+
+  font-weight: 600;
+
+  transition: 0.2s ease;
+}
+
+.empty-create-button:hover {
+  background: #617963;
+
+  transform: translateY(-1px);
+}
+
+
+/* ================================
+   RESPONSIVE
+================================ */
+
+@media (max-width: 1000px) {
+
+  .my-stories-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .my-stories-header {
+    padding: 0 30px;
+  }
+}
+
+
+@media (max-width: 700px) {
+
+  .my-stories-header {
+    padding: 15px 20px;
+
+    min-height: 70px;
+  }
+
+  .my-stories-header-title {
+    position: static;
+
+    transform: none;
+
+    margin-left: 15px;
+  }
+
+  .my-stories-header-title h1 {
+    font-size: 18px;
+  }
+
+  .my-stories-header-title p {
+    display: none;
+  }
+
+  .new-story-button {
+    padding: 10px;
+
+    font-size: 0;
+  }
+
+  .new-story-button svg {
+    font-size: initial;
+  }
+
+  .my-stories-intro {
+    margin-top: 35px;
+  }
+
+  .my-stories-intro h2 {
+    font-size: 25px;
+  }
+
+  .my-stories-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .my-stories-section-heading {
+    align-items: flex-start;
+  }
+}
+
+
+@media (max-width: 450px) {
+
+  .my-stories-header {
+    padding: 12px 15px;
+  }
+
+  .my-stories-back-button {
+    font-size: 0;
+
+    padding: 8px;
+  }
+
+  .my-stories-back-button svg {
+    font-size: initial;
+  }
+
+  .my-stories-header-title h1 {
+    font-size: 16px;
+  }
+
+  .my-stories-content {
+    width: 92%;
+  }
+
+  .my-story-card {
+    padding: 19px;
+  }
+}
