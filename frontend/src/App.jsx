@@ -12,10 +12,12 @@ import MyStories from "./pages/MyStories";
 import LearningJourney from "./pages/LearningJourney";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import { ChildProvider } from "./context/ChildContext";
 
 function App() {
   return (
-    <BrowserRouter>
+    <ChildProvider>
+      <BrowserRouter>
       <Routes>
 
         <Route path="/" element={<Home />} />
@@ -50,6 +52,7 @@ function App() {
 
       </Routes>
     </BrowserRouter>
+    </ChildProvider>
   );
 }
 

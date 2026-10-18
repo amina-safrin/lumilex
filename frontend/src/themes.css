@@ -1,0 +1,316 @@
+/* =========================================================
+   LUMILEX COMFORT THEMES (DYSLEXIA-FRIENDLY PALETTES)
+   Children can select their favorite color comfort world:
+   - 🌳 Forest (Calm greens & earth tones - default)
+   - 🌊 Ocean (Soothing sea blues & aquas)
+   - 🚀 Space (Cosmic purples & golden stars)
+   - 🍬 Candy (Gentle strawberry pinks & cotton candy pastels)
+   - 🌙 Night Owl (Gentle dark mode with high contrast & warm text)
+   ========================================================= */
+
+/* 1. FOREST THEME (Default) */
+body.theme-forest,
+[data-theme="forest"] {
+  --theme-bg: #f5f4ed;
+  --theme-surface: #ffffff;
+  --theme-surface-subtle: #edf6ee;
+  --theme-primary: #478c5c;
+  --theme-primary-hover: #3b764d;
+  --theme-primary-shadow: #2f613e;
+  --theme-text-main: #233829;
+  --theme-text-muted: #566f5c;
+  --theme-accent: #f5b041;
+  --theme-border: #d4e7d7;
+  background-color: var(--theme-bg);
+}
+
+/* 2. OCEAN THEME */
+body.theme-ocean,
+[data-theme="ocean"] {
+  --theme-bg: #ebf5fa;
+  --theme-surface: #ffffff;
+  --theme-surface-subtle: #e0f2fe;
+  --theme-primary: #0284c7;
+  --theme-primary-hover: #0369a1;
+  --theme-primary-shadow: #075985;
+  --theme-text-main: #0c4a6e;
+  --theme-text-muted: #38bdf8;
+  --theme-accent: #38bdf8;
+  --theme-border: #bae6fd;
+  background-color: var(--theme-bg);
+}
+
+body.theme-ocean .sidebar {
+  background: #f0f9ff;
+  border-right-color: #bae6fd;
+}
+body.theme-ocean .reading-adventure {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  border-color: #7dd3fc;
+}
+body.theme-ocean .adventure-art .hill-front {
+  background: #38bdf8 !important;
+}
+body.theme-ocean .adventure-art .hill-back {
+  background: #0284c7 !important;
+}
+body.theme-ocean .primary-button {
+  background: linear-gradient(135deg, #0284c7, #0369a1) !important;
+  box-shadow: 0 4px 0 #075985 !important;
+}
+body.theme-ocean .side-link.active {
+  background: #0284c7 !important;
+  color: #fff !important;
+}
+
+/* 3. SPACE THEME */
+body.theme-space,
+[data-theme="space"] {
+  --theme-bg: #f3f0fa;
+  --theme-surface: #ffffff;
+  --theme-surface-subtle: #ede9fe;
+  --theme-primary: #7c3aed;
+  --theme-primary-hover: #6d28d9;
+  --theme-primary-shadow: #5b21b6;
+  --theme-text-main: #3b0764;
+  --theme-text-muted: #6b21a8;
+  --theme-accent: #fbbf24;
+  --theme-border: #ddd6fe;
+  background-color: var(--theme-bg);
+}
+
+body.theme-space .sidebar {
+  background: #faf5ff;
+  border-right-color: #e9d5ff;
+}
+body.theme-space .reading-adventure {
+  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  border-color: #c4b5fd;
+}
+body.theme-space .adventure-art .hill-front {
+  background: #8b5cf6 !important;
+}
+body.theme-space .adventure-art .hill-back {
+  background: #6d28d9 !important;
+}
+body.theme-space .primary-button {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;
+  box-shadow: 0 4px 0 #5b21b6 !important;
+}
+body.theme-space .side-link.active {
+  background: #7c3aed !important;
+  color: #fff !important;
+}
+
+/* 4. CANDY CLOUD THEME */
+body.theme-candy,
+[data-theme="candy"] {
+  --theme-bg: #fff0f6;
+  --theme-surface: #ffffff;
+  --theme-surface-subtle: #ffe4e6;
+  --theme-primary: #e11d48;
+  --theme-primary-hover: #be123c;
+  --theme-primary-shadow: #9f1239;
+  --theme-text-main: #4c0519;
+  --theme-text-muted: #9f1239;
+  --theme-accent: #f43f5e;
+  --theme-border: #fecdd3;
+  background-color: var(--theme-bg);
+}
+
+body.theme-candy .sidebar {
+  background: #fff5f7;
+  border-right-color: #fecdd3;
+}
+body.theme-candy .reading-adventure {
+  background: linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%);
+  border-color: #fda4af;
+}
+body.theme-candy .adventure-art .hill-front {
+  background: #fb7185 !important;
+}
+body.theme-candy .adventure-art .hill-back {
+  background: #e11d48 !important;
+}
+body.theme-candy .primary-button {
+  background: linear-gradient(135deg, #f43f5e, #e11d48) !important;
+  box-shadow: 0 4px 0 #9f1239 !important;
+}
+body.theme-candy .side-link.active {
+  background: #f43f5e !important;
+  color: #fff !important;
+}
+
+/* 5. NIGHT OWL THEME (Gentle low-glare dark mode for dyslexia) */
+body.theme-night,
+[data-theme="night"] {
+  --theme-bg: #131722;
+  --theme-surface: #1e2433;
+  --theme-surface-subtle: #293043;
+  --theme-primary: #f59e0b;
+  --theme-primary-hover: #d97706;
+  --theme-primary-shadow: #b45309;
+  --theme-text-main: #f3f4f6;
+  --theme-text-muted: #9ca3af;
+  --theme-accent: #fbbf24;
+  --theme-border: #374151;
+  background-color: var(--theme-bg);
+  color: #f3f4f6;
+}
+
+body.theme-night .sidebar {
+  background: #181d2a;
+  border-right-color: #2a3348;
+  color: #e5e7eb;
+}
+body.theme-night .sidebar-logo span,
+body.theme-night .side-link span,
+body.theme-night .dashboard-header h1,
+body.theme-night .adventure-content h2,
+body.theme-night .journey-card h3,
+body.theme-night .interest-summary h3,
+body.theme-night .coming-section h2 {
+  color: #f3f4f6 !important;
+}
+body.theme-night .dashboard-stat,
+body.theme-night .journey-card,
+body.theme-night .interest-summary,
+body.theme-night .dashboard-rewards-strip,
+body.theme-night .clickable-feature,
+body.theme-night .theme-selector-card {
+  background: #1e2433 !important;
+  border-color: #2e374d !important;
+  color: #f3f4f6 !important;
+}
+body.theme-night .reading-adventure {
+  background: linear-gradient(135deg, #1f273b 0%, #151b29 100%) !important;
+  border-color: #37435f !important;
+}
+body.theme-night .primary-button {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  color: #111827 !important;
+  font-weight: 700;
+  box-shadow: 0 4px 0 #92400e !important;
+}
+body.theme-night .side-link {
+  color: #9ca3af;
+}
+body.theme-night .side-link:hover {
+  background: #262e42;
+  color: #f3f4f6;
+}
+body.theme-night .side-link.active {
+  background: #f59e0b !important;
+  color: #111827 !important;
+}
+body.theme-night .learning-page {
+  background: #131722;
+  color: #f3f4f6;
+}
+body.theme-night .duo-topbar {
+  background: #1e2433;
+  border-bottom-color: #2e374d;
+}
+body.theme-night .duo-stat-pill {
+  background: #272f44;
+  border-color: #37425f;
+  color: #f3f4f6;
+}
+body.theme-night .duo-hero-strip,
+body.theme-night .duo-lesson-card {
+  background: #1e2433;
+  border-color: #2e374d;
+  color: #f3f4f6;
+}
+body.theme-night .duo-choice-btn {
+  background: #272f44;
+  border-color: #3d4a6b;
+  color: #f3f4f6;
+}
+body.theme-night .duo-choice-btn:hover {
+  background: #323c57;
+}
+
+/* =========================================================
+   THEME PICKER COMPONENT STYLING
+   ========================================================= */
+.theme-selector-card {
+  background: #ffffff;
+  border: 2px solid #e8ede4;
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.03);
+}
+
+.theme-selector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.theme-selector-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-selector-header p {
+  margin: 4px 0 0 0;
+  font-size: 0.88rem;
+  color: #607267;
+}
+
+.theme-chips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+
+.theme-chip-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 10px;
+  border-radius: 16px;
+  border: 2px solid #e5e9e2;
+  background: #fbfcfb;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: center;
+}
+
+.theme-chip-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.theme-chip-btn.active {
+  border-width: 3px;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.12);
+}
+
+.theme-chip-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.theme-chip-name {
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: #1f2d25;
+}
+
+.theme-chip-tag {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.05);
+  font-weight: 600;
+}

@@ -21,18 +21,21 @@ import {
 import { getLearningState, getGardenStage } from "../utils/learningRewards";
 import { getErrorTrackerState } from "../utils/errorTracker";
 
-function Dashboard() {
-  const navigate = useNavigate();
+import { useChild } from "../context/ChildContext";
+import ThemePicker from "../components/ThemePicker";
 
+function Dashboard() {
+  const { userId } = useChild();
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [rewards, setRewards] = useState(() => getLearningState());
-  const [errorTracker, setErrorTracker] = useState(() => getErrorTrackerState());
+  const [rewards, setRewards] = useState(() => getLearningState(userId));
+  const [errorTracker, setErrorTracker] = useState(() => getErrorTrackerState(userId));
 
   useEffect(() => {
     const refreshRewards = () => {
-      setRewards(getLearningState());
-      setErrorTracker(getErrorTrackerState());
+      setRewards(getLearningState(userId));
+      setErrorTracker(getErrorTrackerState(userId));
     };
     window.addEventListener("storage", refreshRewards);
     window.addEventListener("focus", refreshRewards);
@@ -40,7 +43,7 @@ function Dashboard() {
       window.removeEventListener("storage", refreshRewards);
       window.removeEventListener("focus", refreshRewards);
     };
-  }, []);
+  }, [userId]);
 
   const garden = getGardenStage(rewards);
 
@@ -307,6 +310,11 @@ function Dashboard() {
           <div className="dashboard-reward-item garden-reward"><span className="dashboard-reward-icon">{garden.emoji}</span><div><strong>{garden.name}</strong><small>{garden.description}</small></div></div>
           <button className="dashboard-reward-button" onClick={() => navigate("/learning-journey")}>Open learning journey <ArrowRight size={15} /></button>
         </section>
+
+        {/* =================================================
+            COMFORT THEME SELECTOR (CUSTOMIZED FOR EACH CHILD)
+        ================================================= */}
+        <ThemePicker />
 
         {/* =================================================
             TODAY'S ADVENTURE

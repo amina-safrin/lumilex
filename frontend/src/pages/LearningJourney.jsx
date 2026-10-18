@@ -55,9 +55,11 @@ import {
   completeLessonSession,
   getAdaptiveIntensity
 } from "../utils/errorTracker";
+import { useChild } from "../context/ChildContext";
 
 export default function LearningJourney() {
   const navigate = useNavigate();
+  const { userId, childName, theme } = useChild();
 
   // Cleanup speech synthesis on unmount
   useEffect(() => {
@@ -75,10 +77,16 @@ export default function LearningJourney() {
   }, []);
 
   // =========================================================
-  // STATE
+  // STATE (ISOLATED PER CHILD USER ID)
   // =========================================================
-  const [learningState, setLearningState] = useState(() => getLearningState());
-  const [errorTracker, setErrorTracker] = useState(() => getErrorTrackerState());
+  const [learningState, setLearningState] = useState(() => getLearningState(userId));
+  const [errorTracker, setErrorTracker] = useState(() => getErrorTrackerState(userId));
+
+  // Reload child data whenever userId updates (e.g. login/switch profile)
+  useEffect(() => {
+    setLearningState(getLearningState(userId));
+    setErrorTracker(getErrorTrackerState(userId));
+  }, [userId]);
 
   const [activeLevel, setActiveLevel] = useState(null);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -105,7 +113,7 @@ export default function LearningJourney() {
   const microphoneStreamRef = useRef(null);
 
   const garden = useMemo(() => getGardenStage(learningState), [learningState]);
-  const trickyItems = useMemo(() => getTrickyItems(), [errorTracker]);
+  const trickyItems = useMemo(() => getTrickyItems(null, userId), [errorTracker, userId]);
   const currentIntensity = useMemo(() => getAdaptiveIntensity(errorTracker), [errorTracker]);
 
   const handleToggleMute = () => {
@@ -347,13 +355,13 @@ export default function LearningJourney() {
       playSuccessChime();
       setVoiceFeedback(`🌟 Fantastic! You said "${spoken}"!`);
       setSelectedAnswer(currentQuestion.answer);
-      recordChildSuccess(currentQuestion, activeLevel.id);
-      setErrorTracker(getErrorTrackerState());
+      recordChildSuccess(currentQuestion, activeLevel.id, userId);
+      setErrorTracker(getErrorTrackerState(userId));
     } else {
       playRetryGentleSound();
       setVoiceFeedback(`Heard "${spoken}". Let's try once more, or tap below! 💚`);
-      recordChildMistake(currentQuestion, activeLevel.id);
-      setErrorTracker(getErrorTrackerState());
+      recordChildMistake(currentQuestion, activeLevel.id, userId);
+      setErrorTracker(getErrorTrackerState(userId));
     }
   };
 
@@ -387,14 +395,14 @@ export default function LearningJourney() {
 
     if (isCorrect) {
       playSuccessChime();
-      recordChildSuccess(currentQuestion, activeLevel.id);
+      recordChildSuccess(currentQuestion, activeLevel.id, userId);
     } else {
       playRetryGentleSound();
-      recordChildMistake(currentQuestion, activeLevel.id);
+      recordChildMistake(currentQuestion, activeLevel.id, userId);
       setMistakesInCurrentLesson((prev) => [...prev, currentQuestion]);
     }
 
-    setErrorTracker(getErrorTrackerState());
+    setErrorTracker(getErrorTrackerState(userId));
 
     const nextAnswers = [...answers, isCorrect];
     setAnswers(nextAnswers);
@@ -416,17 +424,19 @@ export default function LearningJourney() {
     const lessonRewardData = completeLessonSession({
       accuracy,
       levelId: activeLevel.id,
-      mistakesCount: mistakesInCurrentLesson.length + (isCorrect ? 0 : 1)
+      mistakesCount: mistakesInCurrentLesson.length + (isCorrect ? 0 : 1),
+      userId
     });
 
     const rewardResult = recordPracticeSession(
       activeLevel.id,
       correctCount,
-      currentQuestionsList.length
+      currentQuestionsList.length,
+      userId
     );
 
     setLearningState(rewardResult.state);
-    setErrorTracker(getErrorTrackerState());
+    setErrorTracker(getErrorTrackerState(userId));
 
     setSessionResult({
       ...rewardResult,
@@ -524,7 +534,7 @@ export default function LearningJourney() {
                     <strong>{currentIntensity.toUpperCase()}</strong>
                   </span>
                 </div>
-                <h1>Your Dyslexia Reading Quest</h1>
+                <h1>{childName}'s Reading Quest</h1>
                 <p>
                   Level by level, sound by sound. Earn crowns, unlock new word powers,
                   and turn tricky letters into lifelong friends!

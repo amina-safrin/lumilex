@@ -9,6 +9,7 @@ const storiesRoutes = require("./routes/stories");
 const authRoutes = require("./routes/authRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const speechRoutes = require("./routes/speech");
+const learningRoutes = require("./routes/learningRoutes");
 
 const app = express();
 
@@ -48,6 +49,8 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/stories", storiesRoutes);
 
 app.use("/api/speech", speechRoutes);
+
+app.use("/api/learning", learningRoutes);
 
 
 // ==============================

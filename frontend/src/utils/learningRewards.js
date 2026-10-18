@@ -7,8 +7,20 @@
 // - Positive reinforcement: effort stars, badges, growing garden
 // =========================================================
 
-const STORAGE_KEY = "lumilex_learning_rewards_v2";
-const LEGACY_STARS_KEY = "lumilex_stars";
+const BASE_STORAGE_KEY = "lumilex_learning_rewards_v2";
+const BASE_LEGACY_STARS_KEY = "lumilex_stars";
+
+// Per-child storage keys — scoped by userId
+function storageKey(userId) {
+  return userId ? `${BASE_STORAGE_KEY}_${userId}` : BASE_STORAGE_KEY;
+}
+function legacyStarsKey(userId) {
+  return userId ? `${BASE_LEGACY_STARS_KEY}_${userId}` : BASE_LEGACY_STARS_KEY;
+}
+
+// Keep non-parameterised exports for backward compatibility (Dashboard currently calls these)
+const STORAGE_KEY = BASE_STORAGE_KEY;
+const LEGACY_STARS_KEY = BASE_LEGACY_STARS_KEY;
 
 export const LEARNING_LEVELS = [
   // -------------------------------------------------------
@@ -649,20 +661,45 @@ const defaultState = () => ({
   gardenPoints: 0,
 });
 
-export function getLearningState() {
+export function getLearningState(userId = null) {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const ssKey = storageKey(userId);
+    const saved = localStorage.getItem(ssKey);
     const state = saved ? { ...defaultState(), ...JSON.parse(saved) } : defaultState();
-    state.stars = Math.max(state.stars || 0, Number(localStorage.getItem(LEGACY_STARS_KEY)) || 0);
+    // Merge legacy stars if present for this user
+    const legacyKey = legacyStarsKey(userId);
+    const legacyStars = Number(localStorage.getItem(legacyKey)) || 0;
+    state.stars = Math.max(state.stars || 0, legacyStars);
     return state;
   } catch {
     return defaultState();
   }
 }
 
-function saveState(state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  localStorage.setItem(LEGACY_STARS_KEY, String(state.stars));
+function saveState(state, userId = null) {
+  const ssKey = storageKey(userId);
+  const legacyKey = legacyStarsKey(userId);
+  localStorage.setItem(ssKey, JSON.stringify(state));
+  localStorage.setItem(legacyKey, String(state.stars));
+
+  // Sync to PostgreSQL in background
+  if (typeof window !== "undefined") {
+    fetch("http://localhost:5000/api/learning/sync-progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        stars: state.stars,
+        currentLevel: state.currentLevel,
+        gardenPoints: state.gardenPoints,
+        completedStories: state.completedStories,
+        completedSessions: state.completedSessions,
+        badges: state.badges,
+        levels: state.levels,
+      }),
+    }).catch((e) => console.warn("Background progress sync skipped:", e.message));
+  }
+
   return state;
 }
 
@@ -672,8 +709,8 @@ function addBadge(state, id, title, description, icon) {
   }
 }
 
-export function recordStoryCompletion() {
-  const state = getLearningState();
+export function recordStoryCompletion(userId = null) {
+  const state = getLearningState(userId);
   state.stars += 3;
   state.completedStories += 1;
   state.gardenPoints += 1;
@@ -687,11 +724,11 @@ export function recordStoryCompletion() {
   if (state.gardenPoints >= 3) {
     addBadge(state, "garden-grower", "Garden Grower", "Helped your learning garden sprout", "🌼");
   }
-  return saveState(state);
+  return saveState(state, userId);
 }
 
-export function recordPracticeSession(levelId, correct, total) {
-  const state = getLearningState();
+export function recordPracticeSession(levelId, correct, total, userId = null) {
+  const state = getLearningState(userId);
   const accuracy = total ? Math.round((correct / total) * 100) : 0;
   const previous = state.levels[levelId] || { attempts: 0, masterySessions: 0, bestAccuracy: 0, completed: false };
   const wasMastery = accuracy >= 75; // Dyslexia-friendly threshold: 75% counts as mastery
@@ -739,7 +776,7 @@ export function recordPracticeSession(levelId, correct, total) {
   if (state.gardenPoints >= 7) addBadge(state, "garden-bloomer", "Garden Bloomer", "Filled your garden with flowers", "🌷");
   if (state.gardenPoints >= 12) addBadge(state, "garden-champion", "Garden Champion", "Full blooming learning garden", "🌻");
 
-  saveState(state);
+  saveState(state, userId);
   return { state, accuracy, levelCompleted: next.completed, newlyMastered, unlockedLevel: state.currentLevel, starsEarned };
 }
 

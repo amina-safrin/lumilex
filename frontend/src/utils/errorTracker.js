@@ -1,13 +1,17 @@
 // =========================================================
 // LUMILEX DYSLEXIA ERROR TRACKER & ADAPTIVE DIFFICULTY ENGINE
-// - Tracks specific letters, words, and sounds the child struggles with
+// - Per-child isolation: Scoped by userId from PostgreSQL
+// - Tracks specific letters, words, and sounds the individual child struggles with
 // - Generates personalized practice sessions targeting those errors
 // - Adapts lesson intensity based on real-time mastery
-// - Celebrates "Perfect Lessons" with Crowns and Gems
+// - Syncs to PostgreSQL backend (/api/learning) with offline fallback
 // =========================================================
 
-const ERROR_STORAGE_KEY = "lumilex_child_errors_v1";
-const PROGRESS_STORAGE_KEY = "lumilex_adaptive_progress_v1";
+const BASE_ERROR_STORAGE_KEY = "lumilex_child_errors_v1";
+
+function errorKey(userId) {
+  return userId ? `${BASE_ERROR_STORAGE_KEY}_${userId}` : BASE_ERROR_STORAGE_KEY;
+}
 
 const defaultErrorState = () => ({
   mistakes: {}, // key: itemIdentifier -> { count, lastSeen, category, questionData, mastered }
@@ -15,42 +19,43 @@ const defaultErrorState = () => ({
   lastPracticeDate: new Date().toISOString().split("T")[0],
   perfectLessonsCount: 0,
   gems: 10,
-  recentAccuracies: []
+  recentAccuracies: [],
 });
 
-export function getErrorTrackerState() {
+export function getErrorTrackerState(userId = null) {
   if (typeof window === "undefined") return defaultErrorState();
   try {
-    const raw = localStorage.getItem(ERROR_STORAGE_KEY);
+    const raw = localStorage.getItem(errorKey(userId));
     return raw ? { ...defaultErrorState(), ...JSON.parse(raw) } : defaultErrorState();
   } catch (e) {
     return defaultErrorState();
   }
 }
 
-export function saveErrorTrackerState(state) {
+export function saveErrorTrackerState(state, userId = null) {
   if (typeof window === "undefined") return state;
   try {
-    localStorage.setItem(ERROR_STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(errorKey(userId), JSON.stringify(state));
   } catch (e) {}
   return state;
 }
 
 /**
- * Record a mistake on a specific question/letter/word
+ * Record a mistake on a specific question/letter/word for this child
  */
-export function recordChildMistake(question, levelId) {
-  const state = getErrorTrackerState();
+export function recordChildMistake(question, levelId, userId = null) {
+  const state = getErrorTrackerState(userId);
   const key = question.letter || question.answer || question.prompt.slice(0, 30);
+  const category = identifyCategory(question);
 
   const prev = state.mistakes[key] || {
     key,
     count: 0,
     levelId,
-    category: identifyCategory(question),
+    category,
     questionData: question,
     mastered: false,
-    history: []
+    history: [],
   };
 
   prev.count += 1;
@@ -59,14 +64,31 @@ export function recordChildMistake(question, levelId) {
   prev.history.push({ correct: false, date: new Date().toISOString() });
 
   state.mistakes[key] = prev;
-  return saveErrorTrackerState(state);
+  saveErrorTrackerState(state, userId);
+
+  // Sync to PostgreSQL database in background
+  if (typeof window !== "undefined") {
+    fetch("http://localhost:5000/api/learning/mistake", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        itemKey: key,
+        levelId,
+        category,
+        questionData: question,
+      }),
+    }).catch((err) => console.warn("Background mistake sync skipped:", err.message));
+  }
+
+  return state;
 }
 
 /**
  * Record success on a question (reduces error weight if previously tricky)
  */
-export function recordChildSuccess(question, levelId) {
-  const state = getErrorTrackerState();
+export function recordChildSuccess(question, levelId, userId = null) {
+  const state = getErrorTrackerState(userId);
   const key = question.letter || question.answer || question.prompt.slice(0, 30);
 
   if (state.mistakes[key]) {
@@ -78,7 +100,19 @@ export function recordChildSuccess(question, levelId) {
     }
   }
 
-  return saveErrorTrackerState(state);
+  saveErrorTrackerState(state, userId);
+
+  // Sync to PostgreSQL database in background
+  if (typeof window !== "undefined") {
+    fetch("http://localhost:5000/api/learning/success", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ itemKey: key }),
+    }).catch((err) => console.warn("Background success sync skipped:", err.message));
+  }
+
+  return state;
 }
 
 /**
@@ -93,10 +127,10 @@ function identifyCategory(question) {
 }
 
 /**
- * Get tricky items for targeted review game sessions
+ * Get tricky items for targeted review game sessions for this child
  */
-export function getTrickyItems(levelId = null) {
-  const state = getErrorTrackerState();
+export function getTrickyItems(levelId = null, userId = null) {
+  const state = getErrorTrackerState(userId);
   const allTricky = Object.values(state.mistakes).filter((m) => !m.mastered && m.count > 0);
 
   if (levelId) {
@@ -108,8 +142,8 @@ export function getTrickyItems(levelId = null) {
 /**
  * Complete a lesson & check for Perfect Lesson reward
  */
-export function completeLessonSession({ accuracy, levelId, mistakesCount }) {
-  const state = getErrorTrackerState();
+export function completeLessonSession({ accuracy, levelId, mistakesCount, userId = null }) {
+  const state = getErrorTrackerState(userId);
   const today = new Date().toISOString().split("T")[0];
 
   // Update streak
@@ -137,14 +171,25 @@ export function completeLessonSession({ accuracy, levelId, mistakesCount }) {
     state.gems += 1;
   }
 
-  saveErrorTrackerState(state);
+  saveErrorTrackerState(state, userId);
+
+  // Sync to PostgreSQL in background
+  if (typeof window !== "undefined") {
+    fetch("http://localhost:5000/api/learning/complete-lesson", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ accuracy, mistakesCount }),
+    }).catch((err) => console.warn("Background lesson sync skipped:", err.message));
+  }
 
   return {
     isPerfect,
     gemsEarned: isPerfect ? 5 : 1,
     streakDays: state.streakDays,
     totalGems: state.gems,
-    intensity: getAdaptiveIntensity(state)
+    perfectLessonsCount: state.perfectLessonsCount,
+    intensity: getAdaptiveIntensity(state),
   };
 }
 
@@ -155,7 +200,7 @@ export function completeLessonSession({ accuracy, levelId, mistakesCount }) {
  * - 'boost': richer challenges if accuracy >= 90%
  */
 export function getAdaptiveIntensity(state = getErrorTrackerState()) {
-  const recents = state.recentAccuracies;
+  const recents = state?.recentAccuracies || [];
   if (!recents || recents.length === 0) return "standard";
 
   const avg = recents.reduce((a, b) => a + b, 0) / recents.length;

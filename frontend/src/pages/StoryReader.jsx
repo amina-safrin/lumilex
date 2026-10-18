@@ -15,6 +15,7 @@ import {
 import "./StoryReader.css";
 
 import { recordStoryCompletion } from "../utils/learningRewards";
+import { useChild } from "../context/ChildContext";
 import {
   playSuccessChime,
   playTapSound,
@@ -89,6 +90,7 @@ function splitSyllables(word) {
 export default function StoryReader() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { userId } = useChild();
 
   // ==========================================
   // STORY
@@ -632,7 +634,7 @@ export default function StoryReader() {
     setPauseMessage("");
     setReadingProgress(100);
 
-    recordStoryCompletion();
+    recordStoryCompletion(userId);
     setStarsEarned(3);
     playSuccessChime();
     setShowCompletion(true);
