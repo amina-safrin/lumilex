@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -8,17 +8,60 @@ import {
   ChevronRight,
   Check,
   WandSparkles,
+  Volume2,
+  VolumeX,
+  Shuffle,
+  PartyPopper,
+  Play,
+  RotateCcw,
 } from "lucide-react";
+import { useChild } from "../context/ChildContext";
+import {
+  playTapSound,
+  playWhooshSound,
+  playMagicSpellSound,
+  playCelebrationFanfare,
+  playSuccessChime,
+  playHintSound,
+  speakText,
+  isSoundsMuted,
+  toggleMuteSounds,
+} from "../utils/childAudio";
 import "./CreateStory.css";
 
 function CreateStory() {
   const navigate = useNavigate();
+  const { childName } = useChild();
+
+  // ============================================
+  // AUDIO & SOUND STATE
+  // ============================================
+  const [muted, setMuted] = useState(isSoundsMuted());
+  const [speakingCard, setSpeakingCard] = useState(null);
+
+  const handleToggleMute = () => {
+    const next = toggleMuteSounds();
+    setMuted(next);
+    if (!next) {
+      playTapSound();
+    }
+  };
+
+  const handleSpeak = (text, cardKey = null, e = null) => {
+    if (e) e.stopPropagation();
+    setSpeakingCard(cardKey);
+    speakText(text, {
+      rate: 0.76,
+      pitch: 1.1,
+      onEnd: () => setSpeakingCard(null),
+      onError: () => setSpeakingCard(null),
+    });
+  };
 
   // ============================================
   // STORY SELECTIONS
   // ============================================
-
-  const [selectedInterests, setSelectedInterests] = useState([]);
+  const [selectedInterests, setSelectedInterests] = useState(["Animals"]);
   const [selectedCharacter, setSelectedCharacter] = useState("Me");
   const [characterName, setCharacterName] = useState("");
   const [selectedMood, setSelectedMood] = useState("Happy");
@@ -28,484 +71,497 @@ function CreateStory() {
   // ============================================
   // GENERATION STATE
   // ============================================
-
   const [isGenerating, setIsGenerating] = useState(false);
-
+  const [generationStep, setGenerationStep] = useState(0);
   const [generationMessage, setGenerationMessage] = useState(
-    "Creating your story..."
+    "Mixing your magical ingredients..."
   );
-
   const [errorMessage, setErrorMessage] = useState("");
-
-  // Stores the story returned by the backend
   const [generatedStory, setGeneratedStory] = useState(null);
 
   // ============================================
-  // OPTIONS
+  // RICH CHILD-FRIENDLY TOPICS
   // ============================================
-
   const interests = [
     {
       name: "Animals",
-      icon: "🐱",
-      description: "Cute animal adventures",
+      icon: "🐶",
+      color: "#f59e0b",
+      description: "Playful puppies, kittens & forest friends",
     },
     {
       name: "Space",
       icon: "🚀",
-      description: "Explore the stars",
+      color: "#8b5cf6",
+      description: "Fly past stars, moons & friendly alien planets",
     },
     {
       name: "Ocean",
-      icon: "🌊",
-      description: "Discover underwater worlds",
+      icon: "🐬",
+      color: "#0284c7",
+      description: "Swim with dolphins, colorful fish & sunken treasures",
     },
     {
-      name: "Adventure",
-      icon: "🗺️",
-      description: "Go on an exciting journey",
+      name: "Dinosaurs",
+      icon: "🦖",
+      color: "#10b981",
+      description: "Friendly baby dinos on gentle prehistoric adventures",
     },
     {
-      name: "Fantasy",
-      icon: "🐉",
-      description: "Enter a magical world",
+      name: "Superheroes",
+      icon: "🦸",
+      color: "#ef4444",
+      description: "Kind hero missions helping friends and saving the day",
     },
     {
-      name: "Nature",
+      name: "Fairy Magic",
+      icon: "🧚",
+      color: "#ec4899",
+      description: "Sparkly enchanted castles, glowing wands & gentle fairies",
+    },
+    {
+      name: "Nature & Forest",
       icon: "🌳",
-      description: "Explore the great outdoors",
+      color: "#15803d",
+      description: "Secret treehouses, blooming flowers & singing birds",
+    },
+    {
+      name: "Bedtime Dreams",
+      icon: "🌙",
+      color: "#6366f1",
+      description: "Cozy lullabies, sleepy clouds & peaceful starry nights",
     },
   ];
 
+  // ============================================
+  // CHARACTERS
+  // ============================================
   const characters = [
     {
       name: "Me",
       icon: "🌟",
-      title: "Me!",
-      description: "Put me in the story",
+      title: childName ? `${childName} (Me!)` : "Me!",
+      description: "Star in the story yourself",
     },
     {
       name: "Animal Friend",
       icon: "🐾",
-      title: "Animal friend",
-      description: "A cute animal hero",
+      title: "Animal Hero",
+      description: "A brave, fuzzy puppy, bunny, or cub",
     },
     {
       name: "Magical Character",
       icon: "🧚",
-      title: "Magic friend",
-      description: "A magical hero",
+      title: "Magic Buddy",
+      description: "A kind wizard, pixie, or gentle baby dragon",
+    },
+    {
+      name: "Robot Buddy",
+      icon: "🤖",
+      title: "Robot Pal",
+      description: "A friendly, beep-boop helper robot",
     },
     {
       name: "Custom",
       icon: "✏️",
-      title: "My own character",
-      description: "I'll choose one",
+      title: "My Own Hero",
+      description: "Type your very own character's name",
     },
   ];
 
+  // ============================================
+  // MOODS
+  // ============================================
   const moods = [
     {
       name: "Happy",
       icon: "😊",
+      label: "Cheerful & sunny",
     },
     {
       name: "Funny",
       icon: "😂",
+      label: "Silly giggles & jokes",
     },
     {
       name: "Adventurous",
       icon: "🗺️",
+      label: "Exciting journeys",
     },
     {
       name: "Magical",
       icon: "✨",
+      label: "Wonder & sparkles",
     },
     {
       name: "Heartwarming",
       icon: "💖",
+      label: "Kind hugs & love",
     },
   ];
 
+  // ============================================
+  // LEVELS
+  // ============================================
   const levels = [
     {
       name: "Beginner",
       icon: "🌱",
-      description: "Simple and easy to read",
+      badge: "Easy Words",
+      description: "Short, simple sentences with gentle phonics",
     },
     {
       name: "Intermediate",
       icon: "🌿",
-      description: "A little more challenging",
+      badge: "Growing Reader",
+      description: "A fun story with a few exciting new words",
     },
     {
       name: "Advanced",
       icon: "🌳",
-      description: "More detailed reading",
+      badge: "Story Master",
+      description: "Richer adventure with more story details",
     },
   ];
 
+  // ============================================
+  // LENGTHS
+  // ============================================
   const lengths = [
     {
       name: "Short",
-      time: "5 min",
-      icon: "🌱",
+      time: "3-5 min",
+      icon: "⚡",
+      badge: "Quick Read",
     },
     {
       name: "Medium",
-      time: "8 min",
-      icon: "🌿",
+      time: "6-8 min",
+      icon: "📖",
+      badge: "Just Right",
     },
     {
       name: "Long",
-      time: "12 min",
-      icon: "🌳",
+      time: "10-12 min",
+      icon: "📚",
+      badge: "Deep Adventure",
     },
   ];
 
   // ============================================
-  // GENERATION MESSAGE ANIMATION
+  // GENERATION MESSAGE & PROGRESS ANIMATION
   // ============================================
+  const messages = [
+    "✨ Stirring the story cauldron...",
+    "🐾 Finding wonderful characters...",
+    "🌟 Picking soft, easy-to-read words...",
+    "🎨 Painting colorful picture scenes...",
+    "🌈 Adding sprinkles of magic...",
+    "🎉 Putting on the shiny cover...",
+  ];
 
   useEffect(() => {
     if (!isGenerating) return;
 
-    const messages = [
-      "Creating your story...",
-      "Finding a fun adventure...",
-      "Choosing the perfect words...",
-      "Adding some magic...",
-      "Making it easy to read...",
-      "Almost ready...",
-    ];
-
-    let index = 0;
-
+    let idx = 0;
     const interval = setInterval(() => {
-      index = (index + 1) % messages.length;
-      setGenerationMessage(messages[index]);
-    }, 1800);
+      idx = (idx + 1) % messages.length;
+      setGenerationStep(idx);
+      setGenerationMessage(messages[idx]);
+      playHintSound();
+    }, 2400);
 
     return () => clearInterval(interval);
   }, [isGenerating]);
 
   // ============================================
-  // SELECT INTEREST
+  // SELECTION HANDLERS WITH SOUND EFFECTS
   // ============================================
-
-  const toggleInterest = (interest) => {
+  const toggleInterest = (interestName) => {
+    playTapSound();
     setErrorMessage("");
 
-    if (selectedInterests.includes(interest)) {
-      setSelectedInterests(
-        selectedInterests.filter((item) => item !== interest)
-      );
+    if (selectedInterests.includes(interestName)) {
+      if (selectedInterests.length > 1) {
+        setSelectedInterests(selectedInterests.filter((item) => item !== interestName));
+      }
     } else {
-      setSelectedInterests([...selectedInterests, interest]);
+      setSelectedInterests([...selectedInterests, interestName]);
     }
   };
 
-  // ============================================
-  // SELECT CHARACTER
-  // ============================================
-
-  const handleCharacterSelect = (character) => {
-    setSelectedCharacter(character);
+  const handleCharacterSelect = (charName) => {
+    playWhooshSound();
+    setSelectedCharacter(charName);
     setErrorMessage("");
-
-    if (character !== "Custom") {
+    if (charName !== "Custom") {
       setCharacterName("");
     }
   };
 
-  // ============================================
-  // CREATE STORY
-  // ============================================
+  const handleMoodSelect = (moodName) => {
+    playTapSound();
+    setSelectedMood(moodName);
+  };
 
+  const handleLevelSelect = (levelName) => {
+    playTapSound();
+    setSelectedLevel(levelName);
+  };
+
+  const handleLengthSelect = (lengthName) => {
+    playTapSound();
+    setSelectedLength(lengthName);
+  };
+
+  // ============================================
+  // SURPRISE ME (MAGIC RANDOMIZER)
+  // ============================================
+  const handleSurpriseMe = () => {
+    playMagicSpellSound();
+
+    // Pick 1 or 2 random topics
+    const shuffledTopics = [...interests].sort(() => 0.5 - Math.random());
+    const randomTopics = shuffledTopics.slice(0, Math.floor(Math.random() * 2) + 1).map((t) => t.name);
+
+    // Pick random character
+    const randomChar = characters[Math.floor(Math.random() * (characters.length - 1))].name;
+
+    // Pick random mood
+    const randomMood = moods[Math.floor(Math.random() * moods.length)].name;
+
+    setSelectedInterests(randomTopics);
+    setSelectedCharacter(randomChar);
+    setSelectedMood(randomMood);
+
+    speakText("Abracadabra! Here is a magical surprise adventure!", { rate: 0.8, pitch: 1.15 });
+  };
+
+  // ============================================
+  // CREATE STORY (CALL BACKEND)
+  // ============================================
   const handleCreateStory = async () => {
     setErrorMessage("");
     setGeneratedStory(null);
 
-    // Validate interests
     if (selectedInterests.length === 0) {
-      setErrorMessage(
-        "Pick at least one story idea before creating your adventure! ✨"
-      );
+      setErrorMessage("Pick at least one story idea before creating your adventure! ✨");
       return;
     }
 
-    // Validate custom character
     if (selectedCharacter === "Custom" && !characterName.trim()) {
       setErrorMessage("Give your character a name first! 😊");
       return;
     }
 
+    // Play sparkling magic spell sound!
+    playMagicSpellSound();
+
     try {
       setIsGenerating(true);
-      setGenerationMessage("Creating your story...");
+      setGenerationStep(0);
+      setGenerationMessage(messages[0]);
 
-      const response = await fetch(
-        "http://localhost:5000/api/stories/generate",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          credentials: "include",
-
-          body: JSON.stringify({
-            interests: selectedInterests,
-            level: selectedLevel,
-            length: selectedLength,
-            characterType: selectedCharacter,
-
-            characterName:
-              selectedCharacter === "Custom"
-                ? characterName.trim()
-                : "",
-
-            mood: selectedMood,
-          }),
-        }
-      );
+      const response = await fetch("http://localhost:5000/api/stories/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          interests: selectedInterests,
+          level: selectedLevel,
+          length: selectedLength,
+          characterType: selectedCharacter,
+          characterName:
+            selectedCharacter === "Custom" ? characterName.trim() : "",
+          mood: selectedMood,
+        }),
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.message ||
-            "Something went wrong while creating your story."
+          data.message || data.error || "Something went wrong while creating your story."
         );
       }
 
-      console.log("Generated story:", data.story);
-
-      // Make sure the backend returned the story
       if (!data.story || !data.story.id) {
-        throw new Error(
-          "Story was created, but its ID was not returned."
-        );
+        throw new Error("Story was created, but its details could not be loaded.");
       }
 
-      // ============================================
-      // STORY CREATED SUCCESSFULLY
-      // ============================================
-
-      // Stop the loading overlay
       setIsGenerating(false);
-
-      // Store the generated story
-      // This will display the "Your Story Is Ready!" card
       setGeneratedStory(data.story);
+
+      // Play joyful fanfare sound for completing creation!
+      playCelebrationFanfare();
+      setTimeout(() => {
+        playSuccessChime();
+        speakText(`Hooray! Your story is ready: ${data.story.title}!`, { rate: 0.82 });
+      }, 500);
     } catch (error) {
       console.error("Error creating story:", error);
-
       setIsGenerating(false);
-
       setErrorMessage(
-        error.message ||
-          "Something went wrong while creating your story. Please try again."
+        error.message || "Oops! The story spell paused. Let's try once more! 🌟"
       );
     }
   };
 
-  // ============================================
-  // READ GENERATED STORY
-  // ============================================
-
   const handleReadGeneratedStory = () => {
-    if (!generatedStory?.id) {
-      return;
-    }
-
+    if (!generatedStory?.id) return;
+    playSuccessChime();
     navigate(`/story/${generatedStory.id}`);
   };
 
-  // ============================================
-  // CREATE ANOTHER STORY
-  // ============================================
-
   const handleCreateAnotherStory = () => {
+    playTapSound();
     setGeneratedStory(null);
     setErrorMessage("");
   };
 
-  // ============================================
-  // SUMMARY TEXT
-  // ============================================
-
-  const getSummaryText = () => {
-    if (selectedInterests.length === 0) {
-      return "Choose what you like and let's make a story!";
-    }
-
-    const topicText =
-      selectedInterests.length === 1
-        ? selectedInterests[0]
-        : selectedInterests.join(" + ");
-
-    let characterText = "";
-
+  const getSummaryCharacterName = () => {
     if (selectedCharacter === "Me") {
-      characterText = "you";
-    } else if (selectedCharacter === "Custom") {
-      characterText = characterName.trim() || "your character";
-    } else {
-      characterText = selectedCharacter.toLowerCase();
+      return childName || "You";
     }
-
-    return `A ${selectedLength.toLowerCase()} ${selectedMood.toLowerCase()} story about ${topicText}, starring ${characterText}.`;
+    if (selectedCharacter === "Custom") {
+      return characterName.trim() || "Your custom hero";
+    }
+    return selectedCharacter;
   };
 
   return (
     <div className="create-story-page">
-
       {/* ============================================
-          GENERATING OVERLAY
+          GENERATING OVERLAY (MAGICAL CAULDRON & FLOATING PARTICLES)
       ============================================ */}
-
       {isGenerating && (
         <div className="story-generating-overlay">
-
           <div className="story-generating-card">
+            <div className="generation-sparkle sparkle-one">✨</div>
+            <div className="generation-sparkle sparkle-two">🌟</div>
+            <div className="generation-sparkle sparkle-three">🪄</div>
+            <div className="generation-sparkle sparkle-four">🚀</div>
+            <div className="generation-sparkle sparkle-five">🐾</div>
 
-            <div className="generation-sparkle sparkle-one">
-              ✨
-            </div>
-
-            <div className="generation-sparkle sparkle-two">
-              ⭐
-            </div>
-
-            <div className="generation-sparkle sparkle-three">
-              ✨
-            </div>
-
-            <div className="generation-sparkle sparkle-four">
-              🌟
-            </div>
-
-            <div className="generation-book">
-
-              <div className="book-page book-left">
-                <BookOpen size={55} />
+            <div className="magic-cauldron">
+              <div className="cauldron-bubble bubble-1"></div>
+              <div className="cauldron-bubble bubble-2"></div>
+              <div className="cauldron-bubble bubble-3"></div>
+              <div className="cauldron-glow"></div>
+              <div className="generation-book">
+                <div className="book-page book-left">
+                  <BookOpen size={48} />
+                </div>
+                <div className="book-page book-right">
+                  <BookOpen size={48} />
+                </div>
               </div>
-
-              <div className="book-page book-right">
-                <BookOpen size={55} />
-              </div>
-
             </div>
+
+            <span className="generation-tag">
+              MAGIC SPELL #{generationStep + 1} OF 6
+            </span>
 
             <h2>{generationMessage}</h2>
 
             <p>
-              LumiLex is creating a special adventure
-              just for you. 💚
+              LumiLex is weaving a delightful, easy-to-read adventure starring{" "}
+              <strong>{getSummaryCharacterName()}</strong>! 💚
             </p>
+
+            <div className="generation-progress-track">
+              <div
+                className="generation-progress-fill"
+                style={{ width: `${((generationStep + 1) / messages.length) * 100}%` }}
+              ></div>
+            </div>
 
             <div className="generation-dots">
               <span></span>
               <span></span>
               <span></span>
             </div>
-
           </div>
-
         </div>
       )}
 
       {/* ============================================
-          GENERATED STORY SUCCESS CARD
+          GENERATED STORY SUCCESS MODAL
       ============================================ */}
-
       {generatedStory && !isGenerating && (
         <div className="generated-story-overlay">
-
           <div className="generated-story-card">
-
-            {/* Decorative sparkles */}
-
-            <div className="generated-story-sparkles">
-              ✨ ⭐ ✨
+            <div className="celebration-confetti">
+              <span>🎉</span>
+              <span>⭐</span>
+              <span>✨</span>
+              <span>🎈</span>
+              <span>🌟</span>
             </div>
-
-            {/* Book icon */}
 
             <div className="generated-story-icon">
-              <BookOpen size={38} />
+              <PartyPopper size={38} />
             </div>
 
-            {/* Label */}
-
             <span className="generated-story-label">
-              YOUR STORY IS READY!
+              🌟 YOUR ADVENTURE IS READY! 🌟
             </span>
-
-            {/* Story title */}
 
             <h2>{generatedStory.title}</h2>
 
-            {/* Message */}
-
             <p className="generated-story-message">
-              You created a special adventure!
-              <br />
-              Are you ready to read it? 🌟
+              A brand new story written just for{" "}
+              <strong>{childName || "you"}</strong> is ready to explore!
             </p>
 
-            {/* Story details */}
-
             <div className="generated-story-details">
-
-              <span>
-                🌱 {generatedStory.difficulty}
-              </span>
-
-              <span>
-                📚 {generatedStory.topic}
-              </span>
-
+              <span>🌱 Level: {generatedStory.difficulty || selectedLevel}</span>
+              <span>📚 Topic: {generatedStory.topic || selectedInterests.join(", ")}</span>
+              <span>💕 Mood: {selectedMood}</span>
             </div>
 
-            {/* Read story */}
+            {/* Audio pronunciation of the title */}
+            <button
+              className="listen-title-btn"
+              onClick={() => handleSpeak(generatedStory.title, "success-title")}
+            >
+              <Volume2 size={18} />
+              Listen to Title Aloud
+            </button>
 
+            {/* Read story button */}
             <button
               className="read-generated-story-button"
               onClick={handleReadGeneratedStory}
             >
-              <BookOpen size={20} />
-
-              Read My Story
-
+              <Play size={20} />
+              Read My Story Now!
               <ChevronRight size={19} />
             </button>
 
             {/* Create another */}
-
             <button
               className="create-another-story-button"
               onClick={handleCreateAnotherStory}
             >
-              ✨ Create Another Story
+              <Sparkles size={16} /> Create Another Adventure
             </button>
-
           </div>
-
         </div>
       )}
 
       {/* ============================================
           HEADER
       ============================================ */}
-
       <header className="create-story-header">
-
         <button
           className="back-button"
-          onClick={() => navigate("/stories")}
+          onClick={() => {
+            playTapSound();
+            navigate("/stories");
+          }}
           disabled={isGenerating || generatedStory}
         >
           <ArrowLeft size={18} />
@@ -513,454 +569,415 @@ function CreateStory() {
         </button>
 
         <div className="create-story-title">
-
           <Sparkles size={24} />
-
-          <h1>
-            Create My Story
-          </h1>
-
+          <h1>Create My Story</h1>
         </div>
 
+        {/* Audio Mute / Unmute Toggle */}
+        <button
+          className={`audio-toggle-btn ${muted ? "is-muted" : ""}`}
+          onClick={handleToggleMute}
+          title={muted ? "Unmute sound effects" : "Mute sound effects"}
+        >
+          {muted ? <VolumeX size={19} /> : <Volume2 size={19} />}
+          <span>{muted ? "Muted" : "Sounds On"}</span>
+        </button>
       </header>
 
       {/* ============================================
-          INTRO
+          INTRO BANNER
       ============================================ */}
-
       <section className="create-story-intro">
-
         <div className="intro-badge">
           <WandSparkles size={16} />
-          Your imagination, your story
+          <span>Interactive Story Maker</span>
         </div>
 
         <h2>
-          ✨ Let's make a story!
+          ✨ What shall we create today,{" "}
+          <span className="child-name-highlight">{childName || "Friend"}</span>?
         </h2>
 
         <p>
-          Pick a few things you like and LumiLex
-          will turn your ideas into a story made
-          especially for you.
+          Pick your favorite characters, places, and feelings. Tap any card to
+          hear it aloud, or hit <strong>Magic Surprise</strong> to let the stars
+          choose!
         </p>
 
+        {/* Story Recipe & Surprise Me Bar */}
+        <div className="magic-recipe-bar">
+          <div className="recipe-items">
+            <span className="recipe-pill">
+              ⭐ <strong>Hero:</strong> {getSummaryCharacterName()}
+            </span>
+            <span className="recipe-pill">
+              🎨 <strong>Theme:</strong> {selectedInterests.join(" + ")}
+            </span>
+            <span className="recipe-pill">
+              💕 <strong>Mood:</strong> {selectedMood}
+            </span>
+            <span className="recipe-pill">
+              🌱 <strong>Level:</strong> {selectedLevel}
+            </span>
+          </div>
+
+          <button
+            className="surprise-me-btn"
+            onClick={handleSurpriseMe}
+            title="Randomly mix a magical adventure!"
+          >
+            <Shuffle size={16} />
+            <span>Surprise Me! 🎲</span>
+          </button>
+        </div>
       </section>
 
       <main className="create-story-content">
-
         {/* ============================================
-            STEP 1 — INTERESTS
+            STEP 1 — WHAT SHOULD YOUR STORY BE ABOUT?
         ============================================ */}
-
         <section className="story-option-card">
-
           <div className="option-heading">
-
-            <span className="option-number">
-              1
-            </span>
-
-            <div>
-              <h3>
-                🌈 What should your story be about?
-              </h3>
-
-              <p>
-                Pick one or more things you love.
-              </p>
+            <span className="option-number">1</span>
+            <div className="option-text-wrapper">
+              <div className="option-title-row">
+                <h3>🌈 What should your story be about?</h3>
+                <button
+                  className="read-heading-btn"
+                  onClick={() =>
+                    handleSpeak(
+                      "Step 1: What should your story be about? Tap one or more things you love!",
+                      "heading-1"
+                    )
+                  }
+                  title="Listen to instructions"
+                >
+                  <Volume2 size={16} />
+                </button>
+              </div>
+              <p>Pick one or more ideas that make you smile!</p>
             </div>
-
           </div>
 
           <div className="interest-grid">
+            {interests.map((interest) => {
+              const isSelected = selectedInterests.includes(interest.name);
+              return (
+                <button
+                  key={interest.name}
+                  className={`interest-card ${isSelected ? "selected" : ""}`}
+                  onClick={() => toggleInterest(interest.name)}
+                  disabled={isGenerating || generatedStory}
+                >
+                  {isSelected && (
+                    <span className="selected-check">
+                      <Check size={14} />
+                    </span>
+                  )}
 
-            {interests.map((interest) => (
+                  <span className="interest-icon">{interest.icon}</span>
 
-              <button
-                key={interest.name}
-                className={`interest-card ${
-                  selectedInterests.includes(
-                    interest.name
-                  )
-                    ? "selected"
-                    : ""
-                }`}
-                onClick={() =>
-                  toggleInterest(interest.name)
-                }
-                disabled={isGenerating || generatedStory}
-              >
+                  <strong className="interest-name">{interest.name}</strong>
 
-                {selectedInterests.includes(
-                  interest.name
-                ) && (
-                  <span className="selected-check">
-                    <Check size={13} />
-                  </span>
-                )}
+                  <small className="interest-desc">{interest.description}</small>
 
-                <span className="interest-icon">
-                  {interest.icon}
-                </span>
-
-                <strong>
-                  {interest.name}
-                </strong>
-
-                <small>
-                  {interest.description}
-                </small>
-
-              </button>
-
-            ))}
-
+                  <button
+                    className="card-audio-speaker"
+                    onClick={(e) =>
+                      handleSpeak(
+                        `${interest.name}! ${interest.description}`,
+                        `interest-${interest.name}`,
+                        e
+                      )
+                    }
+                    title={`Hear ${interest.name} aloud`}
+                  >
+                    <Volume2 size={13} />
+                  </button>
+                </button>
+              );
+            })}
           </div>
-
         </section>
 
         {/* ============================================
-            STEP 2 — CHARACTER
+            STEP 2 — WHO IS THE HERO?
         ============================================ */}
-
         <section className="story-option-card">
-
           <div className="option-heading">
-
-            <span className="option-number">
-              2
-            </span>
-
-            <div>
-              <h3>
-                🧑 Who is going on the adventure?
-              </h3>
-
-              <p>
-                Every story needs a fun character!
-              </p>
+            <span className="option-number">2</span>
+            <div className="option-text-wrapper">
+              <div className="option-title-row">
+                <h3>🧑 Who is the hero of the adventure?</h3>
+                <button
+                  className="read-heading-btn"
+                  onClick={() =>
+                    handleSpeak(
+                      "Step 2: Who is the hero of the adventure? Every great story needs a fun character!",
+                      "heading-2"
+                    )
+                  }
+                  title="Listen to instructions"
+                >
+                  <Volume2 size={16} />
+                </button>
+              </div>
+              <p>Every adventure needs someone special to lead the way.</p>
             </div>
-
           </div>
 
           <div className="character-grid">
+            {characters.map((character) => {
+              const isSelected = selectedCharacter === character.name;
+              return (
+                <button
+                  key={character.name}
+                  className={`character-card ${isSelected ? "selected" : ""}`}
+                  onClick={() => handleCharacterSelect(character.name)}
+                  disabled={isGenerating || generatedStory}
+                >
+                  {isSelected && (
+                    <span className="selected-check">
+                      <Check size={14} />
+                    </span>
+                  )}
 
-            {characters.map((character) => (
+                  <span className="character-icon">{character.icon}</span>
 
-              <button
-                key={character.name}
-                className={`character-card ${
-                  selectedCharacter === character.name
-                    ? "selected"
-                    : ""
-                }`}
-                onClick={() =>
-                  handleCharacterSelect(
-                    character.name
-                  )
-                }
-                disabled={isGenerating || generatedStory}
-              >
+                  <strong className="character-title">{character.title}</strong>
 
-                <span className="character-icon">
-                  {character.icon}
-                </span>
+                  <small className="character-desc">{character.description}</small>
 
-                <strong>
-                  {character.title}
-                </strong>
-
-                <small>
-                  {character.description}
-                </small>
-
-              </button>
-
-            ))}
-
+                  <button
+                    className="card-audio-speaker"
+                    onClick={(e) =>
+                      handleSpeak(
+                        `${character.title}! ${character.description}`,
+                        `char-${character.name}`,
+                        e
+                      )
+                    }
+                    title={`Hear ${character.title} aloud`}
+                  >
+                    <Volume2 size={13} />
+                  </button>
+                </button>
+              );
+            })}
           </div>
 
           {selectedCharacter === "Custom" && (
             <div className="custom-character-box">
-
               <label>
-                <UserRound size={16} />
-                What is your character's name?
+                <UserRound size={17} />
+                What is your hero's name?
               </label>
 
               <input
                 type="text"
                 value={characterName}
-                onChange={(e) =>
-                  setCharacterName(e.target.value)
-                }
-                placeholder="e.g. Luna, Max, Star..."
+                onChange={(e) => setCharacterName(e.target.value)}
+                placeholder="e.g. Luna, Leo, Barnaby, Captain Sparkle..."
                 maxLength={30}
                 disabled={isGenerating || generatedStory}
               />
-
             </div>
           )}
-
         </section>
 
         {/* ============================================
-            STEP 3 — MOOD
+            STEP 3 — HOW SHOULD THE STORY FEEL?
         ============================================ */}
-
         <section className="story-option-card">
-
           <div className="option-heading">
-
-            <span className="option-number">
-              3
-            </span>
-
-            <div>
-              <h3>
-                💕 How should your story feel?
-              </h3>
-
-              <p>
-                Choose the kind of adventure you want.
-              </p>
+            <span className="option-number">3</span>
+            <div className="option-text-wrapper">
+              <div className="option-title-row">
+                <h3>💕 How should the story feel?</h3>
+                <button
+                  className="read-heading-btn"
+                  onClick={() =>
+                    handleSpeak(
+                      "Step 3: How should the story feel? Choose a cozy or silly mood for your tale.",
+                      "heading-3"
+                    )
+                  }
+                  title="Listen to instructions"
+                >
+                  <Volume2 size={16} />
+                </button>
+              </div>
+              <p>Pick the feeling of your adventure.</p>
             </div>
-
           </div>
 
           <div className="mood-grid">
-
-            {moods.map((mood) => (
-
-              <button
-                key={mood.name}
-                className={`mood-card ${
-                  selectedMood === mood.name
-                    ? "selected"
-                    : ""
-                }`}
-                onClick={() =>
-                  setSelectedMood(mood.name)
-                }
-                disabled={isGenerating || generatedStory}
-              >
-
-                <span>
-                  {mood.icon}
-                </span>
-
-                <strong>
-                  {mood.name}
-                </strong>
-
-              </button>
-
-            ))}
-
+            {moods.map((mood) => {
+              const isSelected = selectedMood === mood.name;
+              return (
+                <button
+                  key={mood.name}
+                  className={`mood-card ${isSelected ? "selected" : ""}`}
+                  onClick={() => handleMoodSelect(mood.name)}
+                  disabled={isGenerating || generatedStory}
+                >
+                  <span className="mood-icon">{mood.icon}</span>
+                  <strong className="mood-name">{mood.name}</strong>
+                  <small className="mood-sub">{mood.label}</small>
+                </button>
+              );
+            })}
           </div>
-
         </section>
 
         {/* ============================================
-            STEP 4 — LEVEL
+            STEP 4 — READING LEVEL
         ============================================ */}
-
         <section className="story-option-card">
-
           <div className="option-heading">
-
-            <span className="option-number">
-              4
-            </span>
-
-            <div>
-              <h3>
-                🌱 Choose your reading level
-              </h3>
-
-              <p>
-                We'll make the story comfortable to read.
-              </p>
+            <span className="option-number">4</span>
+            <div className="option-text-wrapper">
+              <div className="option-title-row">
+                <h3>🌱 Choose your reading level</h3>
+                <button
+                  className="read-heading-btn"
+                  onClick={() =>
+                    handleSpeak(
+                      "Step 4: Choose your reading level. We will tailor the words to be just right for you.",
+                      "heading-4"
+                    )
+                  }
+                  title="Listen to instructions"
+                >
+                  <Volume2 size={16} />
+                </button>
+              </div>
+              <p>We'll tune sentence length and vocabulary for comfortable reading.</p>
             </div>
-
           </div>
 
           <div className="level-grid">
-
-            {levels.map((level) => (
-
-              <button
-                key={level.name}
-                className={`level-card ${
-                  selectedLevel === level.name
-                    ? "selected"
-                    : ""
-                }`}
-                onClick={() =>
-                  setSelectedLevel(level.name)
-                }
-                disabled={isGenerating || generatedStory}
-              >
-
-                <span className="level-icon">
-                  {level.icon}
-                </span>
-
-                <div>
-                  <strong>
-                    {level.name}
-                  </strong>
-
-                  <small>
-                    {level.description}
-                  </small>
-                </div>
-
-              </button>
-
-            ))}
-
+            {levels.map((level) => {
+              const isSelected = selectedLevel === level.name;
+              return (
+                <button
+                  key={level.name}
+                  className={`level-card ${isSelected ? "selected" : ""}`}
+                  onClick={() => handleLevelSelect(level.name)}
+                  disabled={isGenerating || generatedStory}
+                >
+                  <span className="level-icon">{level.icon}</span>
+                  <div className="level-info">
+                    <div className="level-header-line">
+                      <strong>{level.name}</strong>
+                      <span className="level-badge">{level.badge}</span>
+                    </div>
+                    <small>{level.description}</small>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-
         </section>
 
         {/* ============================================
-            STEP 5 — LENGTH
+            STEP 5 — STORY LENGTH
         ============================================ */}
-
         <section className="story-option-card">
-
           <div className="option-heading">
-
-            <span className="option-number">
-              5
-            </span>
-
-            <div>
-              <h3>
-                ⏰ How long should your adventure be?
-              </h3>
-
-              <p>
-                Pick how much reading time you'd like.
-              </p>
+            <span className="option-number">5</span>
+            <div className="option-text-wrapper">
+              <div className="option-title-row">
+                <h3>⏰ How long should your adventure be?</h3>
+                <button
+                  className="read-heading-btn"
+                  onClick={() =>
+                    handleSpeak(
+                      "Step 5: How long should your adventure be? Pick a quick read or a longer journey.",
+                      "heading-5"
+                    )
+                  }
+                  title="Listen to instructions"
+                >
+                  <Volume2 size={16} />
+                </button>
+              </div>
+              <p>Pick how much reading time feels comfortable today.</p>
             </div>
-
           </div>
 
           <div className="length-grid">
-
-            {lengths.map((length) => (
-
-              <button
-                key={length.name}
-                className={`length-card ${
-                  selectedLength === length.name
-                    ? "selected"
-                    : ""
-                }`}
-                onClick={() =>
-                  setSelectedLength(length.name)
-                }
-                disabled={isGenerating || generatedStory}
-              >
-
-                <span className="length-icon">
-                  {length.icon}
-                </span>
-
-                <strong>
-                  {length.name}
-                </strong>
-
-                <span>
-                  {length.time}
-                </span>
-
-              </button>
-
-            ))}
-
+            {lengths.map((length) => {
+              const isSelected = selectedLength === length.name;
+              return (
+                <button
+                  key={length.name}
+                  className={`length-card ${isSelected ? "selected" : ""}`}
+                  onClick={() => handleLengthSelect(length.name)}
+                  disabled={isGenerating || generatedStory}
+                >
+                  <span className="length-icon">{length.icon}</span>
+                  <div className="length-info">
+                    <strong>{length.name}</strong>
+                    <span className="length-time">{length.time}</span>
+                  </div>
+                  <span className="length-tag">{length.badge}</span>
+                </button>
+              );
+            })}
           </div>
-
         </section>
 
         {/* ============================================
-            ERROR
+            ERROR MESSAGE
         ============================================ */}
-
         {errorMessage && (
           <div className="story-error">
-
             <span>💛</span>
-
-            <p>
-              {errorMessage}
-            </p>
-
+            <p>{errorMessage}</p>
           </div>
         )}
 
         {/* ============================================
-            STORY SUMMARY
+            SUMMARY CALLOUT
         ============================================ */}
-
         <section className="story-summary">
-
           <div className="summary-icon">
-            <BookOpen size={24} />
+            <BookOpen size={28} />
           </div>
 
           <div className="summary-content">
-
-            <span className="summary-label">
-              YOUR STORY
-            </span>
-
-            <h3>
-              A little adventure is waiting...
-            </h3>
-
+            <span className="summary-label">YOUR SPECIAL ADVENTURE POTION</span>
+            <h3>Ready to brew your story!</h3>
             <p>
-              {getSummaryText()}
+              A <strong>{selectedLength.toLowerCase()}</strong>,{" "}
+              <strong>{selectedMood.toLowerCase()}</strong> adventure about{" "}
+              <strong>{selectedInterests.join(" & ")}</strong>, starring{" "}
+              <strong>{getSummaryCharacterName()}</strong> at the{" "}
+              <strong>{selectedLevel}</strong> reading level.
             </p>
-
           </div>
-
         </section>
 
         {/* ============================================
             CREATE BUTTON
         ============================================ */}
-
         <button
           className="create-story-button"
           onClick={handleCreateStory}
           disabled={
-            selectedInterests.length === 0 ||
-            isGenerating ||
-            generatedStory
+            selectedInterests.length === 0 || isGenerating || generatedStory
           }
         >
-
-          <Sparkles size={20} />
-
-          {isGenerating
-            ? "Creating your story..."
-            : "✨ Create My Story"}
-
-          <ChevronRight size={19} />
-
+          <Sparkles size={22} className="sparkle-spin" />
+          <span>{isGenerating ? "Weaving Story Magic..." : "✨ Create My Story Now!"}</span>
+          <ChevronRight size={22} />
         </button>
 
         <p className="create-story-footer">
-          🌟 Your story will be saved to My Stories
-          so you can read it again anytime.
+          🌟 Your adventure is saved automatically into <strong>My AI Stories</strong> so you can reread it anytime!
         </p>
-
       </main>
-
     </div>
   );
 }

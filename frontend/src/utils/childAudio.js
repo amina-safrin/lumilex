@@ -268,6 +268,63 @@ export function playGemEarnedSound() {
   });
 }
 
+/**
+ * Enchanting sparkling magic spell sound (for AI Story Generation & selections)
+ */
+export function playMagicSpellSound() {
+  if (isSoundsMuted()) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  // Shimmering celestial arpeggio
+  const magicNotes = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98];
+
+  magicNotes.forEach((freq, idx) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+
+    gain.gain.setValueAtTime(0, now + idx * 0.06);
+    gain.gain.linearRampToValueAtTime(0.18, now + idx * 0.06 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.4);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now + idx * 0.06);
+    osc.stop(now + idx * 0.06 + 0.42);
+  });
+}
+
+/**
+ * Gentle whoosh sound when selecting character or topic
+ */
+export function playWhooshSound() {
+  if (isSoundsMuted()) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(220, now);
+  osc.frequency.exponentialRampToValueAtTime(587.33, now + 0.18);
+
+  gain.gain.setValueAtTime(0.12, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(now);
+  osc.stop(now + 0.22);
+}
+
 // ---------------------------------------------------------
 // Speech Synthesis (Slow, Patient, Dyslexia-Optimized)
 // ---------------------------------------------------------
