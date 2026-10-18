@@ -181,7 +181,7 @@ function Dashboard() {
           </button>
 
           {/* PRACTICE */}
-          <button className="side-link" onClick={() => navigate("/learning-journey")}>
+          <button className="side-link" onClick={() => navigate("/practice")}>
             <Dumbbell size={18} />
             <span>Practice</span>
           </button>
@@ -350,7 +350,7 @@ function Dashboard() {
               <ArrowRight size={15} />
 
             </button>
-            <button className="primary-button dashboard-practice-cta" onClick={() => navigate("/learning-journey")}>
+            <button className="primary-button dashboard-practice-cta" onClick={() => navigate("/practice")}>
               Practise skills <ArrowRight size={15} />
             </button>
 

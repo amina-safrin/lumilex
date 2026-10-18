@@ -20,7 +20,6 @@ export const AVAILABLE_THEMES = [
   { id: "ocean", name: "Ocean Breeze", icon: "🌊", bg: "#eaf7ff", accent: "#00a2ff", desc: "Soothing cool blues & sea life" },
   { id: "space", name: "Starry Space", icon: "🚀", bg: "#f3f0ff", accent: "#8a5cf6", desc: "Deep cosmic purples & glowing stars" },
   { id: "candy", name: "Candy Cloud", icon: "🍬", bg: "#fff0f7", accent: "#ff6ea7", desc: "Playful soft pinks & sweet pastel vibes" },
-  { id: "night", name: "Night Owl", icon: "🌙", bg: "#1e2230", accent: "#f5c542", desc: "Gentle low-glare dark mode for eyes" },
 ];
 
 export function ChildProvider({ children }) {

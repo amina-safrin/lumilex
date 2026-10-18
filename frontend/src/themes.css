@@ -1,318 +1,230 @@
 /* =========================================================
    LUMILEX COMFORT THEMES (GLOBAL DYSLEXIA STYLES)
-   Applies across ALL pages: Dashboard, Story Library, Story Reader,
-   Learning Journey, My AI Stories, Create Story, and Settings!
-   - 🌳 Forest: Gentle woodland greens & warm sunshine
-   - 🌊 Ocean: Cool sea breeze, aquatic blues, calm water reflections
-   - 🚀 Space: Deep cosmic purples, starlight gradients, gold glow
-   - 🍬 Candy: Soft strawberry cloud, sweet marshmallow accents
-   - 🌙 Night Owl: High-contrast, glare-free dark mode for eye relaxation
+   Applies dynamically across ALL pages:
+   - Dashboard
+   - Story Library
+   - Story Reader
+   - Learning Journey
+   - Practice
+   - My AI Stories
+   - Create Story
+   - Settings
    ========================================================= */
 
 /* 1. MAGIC FOREST (Default) */
 body.theme-forest,
 [data-theme="forest"] {
-  --theme-bg: #f5f4ed;
+  --theme-bg: #f4f6f0;
   --theme-surface: #ffffff;
-  --theme-surface-subtle: #edf6ee;
-  --theme-primary: #478c5c;
-  --theme-primary-hover: #3b764d;
-  --theme-primary-shadow: #2f613e;
-  --theme-text-main: #233829;
+  --theme-surface-subtle: #edf5ee;
+  --theme-primary: #3d8053;
+  --theme-primary-hover: #326d45;
+  --theme-primary-shadow: #265535;
+  --theme-text-main: #203626;
   --theme-text-muted: #566f5c;
   --theme-accent: #f5b041;
   --theme-border: #d4e7d7;
-  background-color: var(--theme-bg);
+  --theme-chip-bg: #eaf4eb;
+  --theme-header-bg: #ffffff;
+  background-color: var(--theme-bg) !important;
+  color: var(--theme-text-main) !important;
 }
 
 /* 2. OCEAN BREEZE */
 body.theme-ocean,
 [data-theme="ocean"] {
-  --theme-bg: #eaf6fc;
+  --theme-bg: #e6f4fa;
   --theme-surface: #ffffff;
-  --theme-surface-subtle: #dff0fa;
+  --theme-surface-subtle: #d7effb;
   --theme-primary: #0284c7;
   --theme-primary-hover: #0369a1;
   --theme-primary-shadow: #075985;
   --theme-text-main: #0c4a6e;
   --theme-text-muted: #0284c7;
   --theme-accent: #38bdf8;
-  --theme-border: #bae6fd;
-  background-color: var(--theme-bg);
-}
-
-body.theme-ocean .sidebar {
-  background: #f0f9ff;
-  border-right-color: #bae6fd;
-}
-body.theme-ocean .reading-adventure {
-  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%) !important;
-  border-color: #7dd3fc !important;
-}
-body.theme-ocean .adventure-art .hill-front {
-  background: #38bdf8 !important;
-}
-body.theme-ocean .adventure-art .hill-back {
-  background: #0284c7 !important;
-}
-body.theme-ocean .primary-button,
-body.theme-ocean .story-card-btn,
-body.theme-ocean .duo-primary-btn,
-body.theme-ocean .save-button {
-  background: linear-gradient(135deg, #0284c7, #0369a1) !important;
-  box-shadow: 0 4px 0 #075985 !important;
-}
-body.theme-ocean .side-link.active {
-  background: #0284c7 !important;
-  color: #fff !important;
-}
-body.theme-ocean .duo-topbar {
-  background: #f0f9ff;
-  border-bottom-color: #bae6fd;
-}
-body.theme-ocean .duo-hero-card {
-  background: linear-gradient(135deg, #e0f2fe, #bae6fd) !important;
-  border-color: #7dd3fc !important;
-}
-body.theme-ocean .reader-toolbar {
-  background: #f0f9ff !important;
-  border-color: #bae6fd !important;
+  --theme-border: #b8e2f8;
+  --theme-chip-bg: #e0f2fe;
+  --theme-header-bg: #f0f9ff;
+  background-color: var(--theme-bg) !important;
+  color: var(--theme-text-main) !important;
 }
 
 /* 3. STARRY SPACE */
 body.theme-space,
 [data-theme="space"] {
-  --theme-bg: #f4f0fa;
+  --theme-bg: #f2eefa;
   --theme-surface: #ffffff;
-  --theme-surface-subtle: #ede9fe;
+  --theme-surface-subtle: #eae3fb;
   --theme-primary: #7c3aed;
   --theme-primary-hover: #6d28d9;
   --theme-primary-shadow: #5b21b6;
   --theme-text-main: #3b0764;
   --theme-text-muted: #7c3aed;
   --theme-accent: #fbbf24;
-  --theme-border: #ddd6fe;
-  background-color: var(--theme-bg);
-}
-
-body.theme-space .sidebar {
-  background: #faf5ff;
-  border-right-color: #e9d5ff;
-}
-body.theme-space .reading-adventure {
-  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%) !important;
-  border-color: #c4b5fd !important;
-}
-body.theme-space .adventure-art .hill-front {
-  background: #8b5cf6 !important;
-}
-body.theme-space .adventure-art .hill-back {
-  background: #6d28d9 !important;
-}
-body.theme-space .primary-button,
-body.theme-space .story-card-btn,
-body.theme-space .duo-primary-btn,
-body.theme-space .save-button {
-  background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;
-  box-shadow: 0 4px 0 #5b21b6 !important;
-}
-body.theme-space .side-link.active {
-  background: #7c3aed !important;
-  color: #fff !important;
-}
-body.theme-space .duo-topbar {
-  background: #faf5ff;
-  border-bottom-color: #e9d5ff;
-}
-body.theme-space .duo-hero-card {
-  background: linear-gradient(135deg, #ede9fe, #ddd6fe) !important;
-  border-color: #c4b5fd !important;
-}
-body.theme-space .reader-toolbar {
-  background: #faf5ff !important;
-  border-color: #e9d5ff !important;
+  --theme-border: #d8cdfa;
+  --theme-chip-bg: #ede9fe;
+  --theme-header-bg: #faf5ff;
+  background-color: var(--theme-bg) !important;
+  color: var(--theme-text-main) !important;
 }
 
 /* 4. CANDY CLOUD */
 body.theme-candy,
 [data-theme="candy"] {
-  --theme-bg: #fff0f5;
+  --theme-bg: #fdf0f4;
   --theme-surface: #ffffff;
-  --theme-surface-subtle: #ffe4e6;
+  --theme-surface-subtle: #fce2ea;
   --theme-primary: #e11d48;
   --theme-primary-hover: #be123c;
   --theme-primary-shadow: #9f1239;
   --theme-text-main: #4c0519;
   --theme-text-muted: #e11d48;
   --theme-accent: #f43f5e;
-  --theme-border: #fecdd3;
-  background-color: var(--theme-bg);
-}
-
-body.theme-candy .sidebar {
-  background: #fff5f7;
-  border-right-color: #fecdd3;
-}
-body.theme-candy .reading-adventure {
-  background: linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%) !important;
-  border-color: #fda4af !important;
-}
-body.theme-candy .adventure-art .hill-front {
-  background: #fb7185 !important;
-}
-body.theme-candy .adventure-art .hill-back {
-  background: #e11d48 !important;
-}
-body.theme-candy .primary-button,
-body.theme-candy .story-card-btn,
-body.theme-candy .duo-primary-btn,
-body.theme-candy .save-button {
-  background: linear-gradient(135deg, #f43f5e, #e11d48) !important;
-  box-shadow: 0 4px 0 #9f1239 !important;
-}
-body.theme-candy .side-link.active {
-  background: #f43f5e !important;
-  color: #fff !important;
-}
-body.theme-candy .duo-topbar {
-  background: #fff5f7;
-  border-bottom-color: #fecdd3;
-}
-body.theme-candy .duo-hero-card {
-  background: linear-gradient(135deg, #ffe4e6, #fecdd3) !important;
-  border-color: #fda4af !important;
-}
-body.theme-candy .reader-toolbar {
-  background: #fff5f7 !important;
-  border-color: #fecdd3 !important;
-}
-
-/* 5. NIGHT OWL (Gentle low-glare dark mode for dyslexia) */
-body.theme-night,
-[data-theme="night"] {
-  --theme-bg: #12151f;
-  --theme-surface: #1b2030;
-  --theme-surface-subtle: #242b40;
-  --theme-primary: #f59e0b;
-  --theme-primary-hover: #d97706;
-  --theme-primary-shadow: #b45309;
-  --theme-text-main: #f3f4f6;
-  --theme-text-muted: #9ca3af;
-  --theme-accent: #fbbf24;
-  --theme-border: #2d364f;
+  --theme-border: #f9c6d3;
+  --theme-chip-bg: #ffe4e6;
+  --theme-header-bg: #fff5f7;
   background-color: var(--theme-bg) !important;
-  color: #f3f4f6 !important;
-}
-
-body.theme-night .sidebar {
-  background: #171b29;
-  border-right-color: #262e44;
-}
-body.theme-night .sidebar-logo span,
-body.theme-night .side-link span,
-body.theme-night .dashboard-header h1,
-body.theme-night .adventure-content h2,
-body.theme-night .journey-card h3,
-body.theme-night .interest-summary h3,
-body.theme-night .coming-section h2,
-body.theme-night .story-card h3,
-body.theme-night .story-reader-header h1,
-body.theme-night .section-intro h2,
-body.theme-night .settings-header-title h1 {
-  color: #f3f4f6 !important;
-}
-body.theme-night .dashboard-stat,
-body.theme-night .journey-card,
-body.theme-night .interest-summary,
-body.theme-night .dashboard-rewards-strip,
-body.theme-night .clickable-feature,
-body.theme-night .theme-selector-card,
-body.theme-night .story-card,
-body.theme-night .profile-card-section,
-body.theme-night .settings-accordion-bar,
-body.theme-night .story-reader-container {
-  background: #1b2030 !important;
-  border-color: #2d364f !important;
-  color: #f3f4f6 !important;
-}
-body.theme-night .reading-adventure {
-  background: linear-gradient(135deg, #1b2234 0%, #131724 100%) !important;
-  border-color: #333f5d !important;
-}
-body.theme-night .primary-button,
-body.theme-night .story-card-btn,
-body.theme-night .duo-primary-btn,
-body.theme-night .save-button {
-  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
-  color: #111827 !important;
-  font-weight: 800;
-  box-shadow: 0 4px 0 #92400e !important;
-}
-body.theme-night .side-link {
-  color: #9ca3af;
-}
-body.theme-night .side-link:hover {
-  background: #232a3f;
-  color: #f3f4f6;
-}
-body.theme-night .side-link.active {
-  background: #f59e0b !important;
-  color: #111827 !important;
-}
-body.theme-night .learning-page {
-  background: #12151f !important;
-  color: #f3f4f6 !important;
-}
-body.theme-night .duo-topbar {
-  background: #1b2030 !important;
-  border-bottom-color: #2d364f !important;
-}
-body.theme-night .duo-stat-pill {
-  background: #242b40 !important;
-  border-color: #35405e !important;
-  color: #f3f4f6 !important;
-}
-body.theme-night .duo-hero-card,
-body.theme-night .duo-lesson-card {
-  background: #1b2030 !important;
-  border-color: #2d364f !important;
-  color: #f3f4f6 !important;
-}
-body.theme-night .duo-choice-btn {
-  background: #242b40 !important;
-  border-color: #35405e !important;
-  color: #f3f4f6 !important;
-}
-body.theme-night .duo-choice-btn:hover {
-  background: #2d364f !important;
-}
-body.theme-night .reader-toolbar {
-  background: #1b2030 !important;
-  border-color: #2d364f !important;
-}
-body.theme-night .reader-btn {
-  background: #242b40 !important;
-  border-color: #35405e !important;
-  color: #f3f4f6 !important;
-}
-body.theme-night .reader-paragraph {
-  color: #f3f4f6 !important;
-}
-body.theme-night .settings-page {
-  background-color: #12151f !important;
-  color: #f3f4f6 !important;
-}
-body.theme-night .settings-topbar {
-  background: #1b2030 !important;
-  border-bottom-color: #2d364f !important;
-}
-body.theme-night .settings-back-btn {
-  border-color: #35405e !important;
-  color: #f3f4f6 !important;
+  color: var(--theme-text-main) !important;
 }
 
 /* =========================================================
-   THEME PICKER COMPONENT STYLING
+   PAGE-WIDE COMPONENT OVERRIDES ACCORDING TO ACTIVE THEME
+   ========================================================= */
+
+/* All page wrappers */
+.dashboard,
+.story-library,
+.my-stories-page,
+.learning-page,
+.practice-page,
+.create-story-page,
+.story-reader-page,
+.settings-page {
+  background-color: var(--theme-bg) !important;
+  color: var(--theme-text-main) !important;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Headers across pages */
+.story-header,
+.my-stories-header,
+.settings-topbar,
+.duo-topbar {
+  background: var(--theme-header-bg, #ffffff) !important;
+  border-bottom-color: var(--theme-border, #e2e8df) !important;
+}
+
+/* Sidebar */
+.sidebar {
+  background: var(--theme-surface, #ffffff) !important;
+  border-right-color: var(--theme-border, #e2e8df) !important;
+}
+
+.side-link.active {
+  background: var(--theme-primary) !important;
+  color: #ffffff !important;
+}
+
+.side-link:hover:not(.active) {
+  background: var(--theme-surface-subtle) !important;
+}
+
+/* Cards across Story Library and My AI Stories */
+.story-card {
+  background: var(--theme-surface, #ffffff) !important;
+  border-color: var(--theme-border, #e1e7df) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+}
+
+.story-card:hover {
+  border-color: var(--theme-primary) !important;
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08) !important;
+}
+
+.story-card-icon {
+  background: var(--theme-surface-subtle) !important;
+}
+
+.story-card-title {
+  color: var(--theme-text-main) !important;
+}
+
+.category-button,
+.filter-button {
+  background: var(--theme-surface, #ffffff) !important;
+  border-color: var(--theme-border, #d9e2d6) !important;
+  color: var(--theme-text-main) !important;
+}
+
+.category-button.active,
+.filter-button.active {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: #ffffff !important;
+}
+
+.create-story-link,
+.my-stories-create-button {
+  background: var(--theme-primary) !important;
+  box-shadow: 0 3px 0 var(--theme-primary-shadow) !important;
+}
+
+.create-story-link:hover,
+.my-stories-create-button:hover {
+  background: var(--theme-primary-hover) !important;
+}
+
+.back-button,
+.my-stories-back-button,
+.settings-back-btn,
+.duo-back-btn {
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text-main) !important;
+  background: var(--theme-surface, #ffffff) !important;
+}
+
+.back-button:hover,
+.my-stories-back-button:hover,
+.settings-back-btn:hover,
+.duo-back-btn:hover {
+  background: var(--theme-surface-subtle) !important;
+}
+
+.primary-button,
+.duo-primary-btn,
+.save-button {
+  background: var(--theme-primary) !important;
+  box-shadow: 0 4px 0 var(--theme-primary-shadow) !important;
+  color: #ffffff !important;
+}
+
+.primary-button:hover:not(:disabled),
+.duo-primary-btn:hover:not(:disabled),
+.save-button:hover:not(:disabled) {
+  background: var(--theme-primary-hover) !important;
+}
+
+/* Reading adventure card in Dashboard */
+.reading-adventure {
+  background: linear-gradient(135deg, var(--theme-surface-subtle) 0%, var(--theme-surface) 100%) !important;
+  border-color: var(--theme-border) !important;
+}
+
+/* Duolingo Hero Card */
+.duo-hero-card {
+  background: linear-gradient(135deg, var(--theme-surface-subtle) 0%, var(--theme-surface) 100%) !important;
+  border-color: var(--theme-border) !important;
+}
+
+.duo-stat-pill {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text-main) !important;
+}
+
+/* =========================================================
+   THEME PICKER CHIP BUTTONS
    ========================================================= */
 .theme-selector-card {
   background: var(--theme-surface, #ffffff);
@@ -320,13 +232,6 @@ body.theme-night .settings-back-btn {
   border-radius: 20px;
   padding: 24px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.03);
-}
-
-.theme-selector-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
 }
 
 .theme-selector-header h3 {
@@ -346,8 +251,8 @@ body.theme-night .settings-back-btn {
 
 .theme-chips-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
 }
 
 .theme-chip-btn {
@@ -355,7 +260,7 @@ body.theme-night .settings-back-btn {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 14px 10px;
+  padding: 16px 12px;
   border-radius: 16px;
   border: 2px solid var(--theme-border, #e5e9e2);
   background: var(--theme-surface, #fbfcfb);
@@ -376,20 +281,20 @@ body.theme-night .settings-back-btn {
 }
 
 .theme-chip-icon {
-  font-size: 1.9rem;
+  font-size: 2rem;
   line-height: 1;
 }
 
 .theme-chip-name {
   font-weight: 700;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   color: var(--theme-text-main, #1f2d25);
 }
 
 .theme-chip-tag {
-  font-size: 0.72rem;
-  padding: 2px 8px;
-  border-radius: 10px;
+  font-size: 0.74rem;
+  padding: 3px 10px;
+  border-radius: 12px;
   background: rgba(0, 0, 0, 0.06);
   font-weight: 700;
 }

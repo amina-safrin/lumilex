@@ -56,6 +56,7 @@ import {
   getAdaptiveIntensity
 } from "../utils/errorTracker";
 import { useChild } from "../context/ChildContext";
+import VirtualTree from "../components/VirtualTree";
 
 export default function LearningJourney() {
   const navigate = useNavigate();
@@ -572,6 +573,15 @@ export default function LearningJourney() {
                 </div>
               </div>
             </section>
+
+            {/* VIRTUAL READING TREE GROWTH */}
+            <VirtualTree
+              gardenPoints={learningState.gardenPoints}
+              completedStories={learningState.completedStories}
+              completedSessions={learningState.completedSessions}
+              stars={learningState.stars}
+              childName={childName}
+            />
 
             {/* DUOLINGO STEPPING STONES PATH */}
             <section className="duo-learning-path">

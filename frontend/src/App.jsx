@@ -10,6 +10,7 @@ import ChildProfile from "./pages/ChildProfile";
 import Dashboard from "./pages/Dashboard";
 import MyStories from "./pages/MyStories";
 import LearningJourney from "./pages/LearningJourney";
+import Practice from "./pages/Practice";
 import Settings from "./pages/Settings";
 
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -32,6 +33,7 @@ function App() {
         <Route path="/story/:id" element={<StoryReader />} />
         <Route path="/my-stories" element={<MyStories />} />
         <Route path="/learning-journey" element={<ProtectedRoute><LearningJourney /></ProtectedRoute>} />
+        <Route path="/practice" element={<ProtectedRoute><Practice /></ProtectedRoute>} />
 
         <Route
           path="/child-profile"

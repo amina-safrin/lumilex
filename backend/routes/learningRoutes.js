@@ -303,7 +303,7 @@ router.post("/theme", authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const { theme } = req.body;
 
-    const validThemes = ["forest", "ocean", "space", "candy", "night"];
+    const validThemes = ["forest", "ocean", "space", "candy"];
     const chosenTheme = validThemes.includes(theme) ? theme : "forest";
 
     const result = await pool.query(

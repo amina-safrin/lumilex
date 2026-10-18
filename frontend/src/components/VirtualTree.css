@@ -1,0 +1,377 @@
+/* =========================================================
+   VIRTUAL READING TREE COMPONENT STYLING
+   Visual tree growth based on garden points, stories & lessons
+   ========================================================= */
+
+.virtual-tree-container {
+  background: var(--theme-surface, #ffffff);
+  border: 2px solid var(--theme-border, #d8e6d9);
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 32px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s ease;
+}
+
+.virtual-tree-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tree-stage-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--theme-chip-bg, #eaf5eb);
+  color: var(--theme-primary, #3d8053);
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.tree-header-text h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--theme-text-main, #203626);
+}
+
+.tree-header-text p {
+  margin: 0;
+  color: var(--theme-text-muted, #566f5c);
+  font-size: 0.94rem;
+}
+
+.tree-points-pill {
+  background: var(--theme-chip-bg, #edf6ee);
+  border: 2px solid var(--theme-border, #d4e7d7);
+  padding: 8px 16px;
+  border-radius: 16px;
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: var(--theme-primary, #3d8053);
+}
+
+/* =========================================================
+   CANVAS & GRAPHICS
+   ========================================================= */
+.tree-canvas {
+  position: relative;
+  background: linear-gradient(180deg, var(--theme-surface-subtle, #f0f7f1) 0%, var(--theme-surface, #ffffff) 100%);
+  border: 2px solid var(--theme-border, #e0ede2);
+  border-radius: 20px;
+  padding: 30px 20px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+
+.tree-sky-particles {
+  position: absolute;
+  top: 15px;
+  left: 0;
+  right: 0;
+  height: 60px;
+  pointer-events: none;
+}
+
+.floating-sparkle {
+  position: absolute;
+  font-size: 1.1rem;
+  animation: floatSparkle 3s ease-in-out infinite alternate;
+}
+
+.sp-0 { top: 10px; left: 20%; animation-delay: 0s; }
+.sp-1 { top: 25px; right: 25%; animation-delay: 0.7s; }
+.sp-2 { top: 15px; left: 40%; animation-delay: 1.4s; }
+.sp-3 { top: 30px; right: 15%; animation-delay: 2.1s; }
+.sp-4 { top: 5px; left: 60%; animation-delay: 1.1s; }
+
+@keyframes floatSparkle {
+  0% { transform: translateY(0) scale(0.9); opacity: 0.6; }
+  100% { transform: translateY(-8px) scale(1.2); opacity: 1; }
+}
+
+.floating-butterfly {
+  position: absolute;
+  top: 25px;
+  left: 28%;
+  font-size: 1.4rem;
+  animation: flutterFly 4s ease-in-out infinite alternate;
+}
+
+@keyframes flutterFly {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(20px, -10px) rotate(8deg); }
+  100% { transform: translate(40px, -5px) rotate(-6deg); }
+}
+
+.floating-bird {
+  position: absolute;
+  top: 18px;
+  right: 28%;
+  font-size: 1.3rem;
+  animation: birdHover 3.5s ease-in-out infinite alternate;
+}
+
+@keyframes birdHover {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-12px); }
+}
+
+/* =========================================================
+   DYNAMIC TREE MODELS BY STAGE
+   ========================================================= */
+.tree-graphic-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 16px 0 24px 0;
+  position: relative;
+  min-height: 160px;
+  justify-content: flex-end;
+}
+
+/* Stage 0: Seed */
+.seed-model {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.seed-sprout-head {
+  font-size: 3.2rem;
+  animation: seedPulse 2.5s ease-in-out infinite;
+}
+@keyframes seedPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+/* Stage 1: Sprout */
+.little-sprout-model {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  position: relative;
+}
+.sprout-leaf-left {
+  font-size: 2.4rem;
+  transform: rotate(-30deg);
+  animation: leafWiggleLeft 2.5s ease-in-out infinite alternate;
+}
+.sprout-leaf-right {
+  font-size: 2.4rem;
+  transform: rotate(30deg);
+  animation: leafWiggleRight 2.5s ease-in-out infinite alternate;
+}
+.sprout-stem {
+  width: 10px;
+  height: 48px;
+  background: linear-gradient(180deg, #78c66e, #4b9b43);
+  border-radius: 6px;
+  margin: 0 -4px;
+}
+
+@keyframes leafWiggleLeft {
+  0% { transform: rotate(-30deg); }
+  100% { transform: rotate(-20deg); }
+}
+@keyframes leafWiggleRight {
+  0% { transform: rotate(30deg); }
+  100% { transform: rotate(20deg); }
+}
+
+/* Stage 2: Sapling */
+.sapling-model {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.sapling-canopy {
+  display: flex;
+  gap: 4px;
+  font-size: 2.8rem;
+  animation: saplingBreeze 3s ease-in-out infinite alternate;
+}
+.sapling-trunk {
+  width: 16px;
+  height: 60px;
+  background: linear-gradient(180deg, #8d6e63, #5d4037);
+  border-radius: 8px;
+  margin-top: -8px;
+}
+
+@keyframes saplingBreeze {
+  0% { transform: rotate(-2deg); }
+  100% { transform: rotate(2deg); }
+}
+
+/* Stage 3: Flowering Wonder Tree */
+.flowering-tree-model {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.canopy-blossoms {
+  display: flex;
+  gap: 6px;
+  font-size: 3.2rem;
+  animation: flowerSway 3s ease-in-out infinite alternate;
+}
+.flowering-trunk {
+  width: 22px;
+  height: 72px;
+  background: linear-gradient(180deg, #8d6e63, #4e342e);
+  border-radius: 10px;
+  margin-top: -10px;
+}
+
+@keyframes flowerSway {
+  0% { transform: translateY(0) rotate(-1.5deg); }
+  100% { transform: translateY(-4px) rotate(1.5deg); }
+}
+
+/* Stage 4: Wisdom Oak */
+.wisdom-tree-model {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.wisdom-canopy {
+  position: relative;
+  text-align: center;
+}
+.canopy-top {
+  font-size: 5.5rem;
+  line-height: 1;
+  animation: wisdomGlow 3s ease-in-out infinite alternate;
+}
+.canopy-apples {
+  position: absolute;
+  top: 25px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  font-size: 1.5rem;
+}
+
+@keyframes wisdomGlow {
+  0% { filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.4)); }
+  100% { filter: drop-shadow(0 0 16px rgba(255, 215, 0, 0.8)); }
+}
+
+.wisdom-trunk {
+  width: 32px;
+  height: 70px;
+  background: linear-gradient(180deg, #6d4c41, #3e2723);
+  border-radius: 12px;
+  margin-top: -12px;
+}
+
+/* Tree ground with flowers */
+.tree-ground {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+.ground-grass-patch {
+  width: 260px;
+  height: 16px;
+  background: linear-gradient(90deg, transparent, #5dbb63, #489b4d, transparent);
+  border-radius: 16px;
+}
+.ground-flowers {
+  display: flex;
+  gap: 22px;
+  font-size: 1.3rem;
+  margin-top: -8px;
+}
+
+/* =========================================================
+   PROGRESS TRACK & GOAL
+   ========================================================= */
+.tree-progress-box {
+  width: 100%;
+  max-width: 520px;
+  background: var(--theme-surface, #ffffff);
+  border: 1px solid var(--theme-border, #d8e2d5);
+  border-radius: 16px;
+  padding: 14px 18px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.tree-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.92rem;
+  margin-bottom: 8px;
+}
+
+.tree-progress-track {
+  width: 100%;
+  height: 12px;
+  background: var(--theme-surface-subtle, #e8f3e9);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.tree-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #52b788, #2d6a4f);
+  border-radius: 10px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.next-goal-text {
+  margin: 8px 0 0 0;
+  font-size: 0.85rem;
+  color: var(--theme-text-muted, #566f5c);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* =========================================================
+   NURTURE STATS ROW
+   ========================================================= */
+.tree-nurture-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.nurture-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--theme-surface-subtle, #f5faf6);
+  border: 1px solid var(--theme-border, #dce8dd);
+  border-radius: 16px;
+}
+
+.nurture-icon {
+  font-size: 1.8rem;
+}
+
+.nurture-stat strong {
+  display: block;
+  font-size: 0.92rem;
+  color: var(--theme-text-main, #203626);
+}
+
+.nurture-stat small {
+  font-size: 0.78rem;
+  color: var(--theme-text-muted, #566f5c);
+}
