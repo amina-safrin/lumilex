@@ -41,7 +41,7 @@ export const LEARNING_LEVELS = [
         pictureLabel: "Apple",
         choices: ["A", "B", "C"],
         answer: "A",
-        hint: "Say apple slowly: /a/pple. A is for Apple! 🍎",
+        hint: "Say apple slowly: a-pple. A is for Apple! 🍎",
         letter: "A",
         soundExamples: [
           { label: "A", word: "apple" },
@@ -55,7 +55,7 @@ export const LEARNING_LEVELS = [
         pictureLabel: "Ball",
         choices: ["B", "D", "P"],
         answer: "B",
-        hint: "B has a big bouncy belly in front, just like a Ball! /b/ Ball. ⚽",
+        hint: "B has a big bouncy belly in front, just like a Ball! b as in Ball. ⚽",
         letter: "B",
         soundExamples: [
           { label: "B", word: "ball" },
@@ -69,7 +69,7 @@ export const LEARNING_LEVELS = [
         pictureLabel: "Cat",
         choices: ["C", "S", "O"],
         answer: "C",
-        hint: "Letter C is curved like a cozy sleeping cat! /k/ Cat. 🐱",
+        hint: "Letter C is curved like a cozy sleeping cat! c as in Cat. 🐱",
         letter: "C",
         soundExamples: [
           { label: "C", word: "cat" },
@@ -83,7 +83,7 @@ export const LEARNING_LEVELS = [
         pictureLabel: "Dog",
         choices: ["D", "B", "T"],
         answer: "D",
-        hint: "Letter D has its round tummy on the left, waiting for a pet! /d/ Dog. 🐶",
+        hint: "Letter D has its round tummy on the left, waiting for a pet! d as in Dog. 🐶",
         letter: "D",
         soundExamples: [
           { label: "D", word: "dog" },
@@ -97,7 +97,7 @@ export const LEARNING_LEVELS = [
         pictureLabel: "Elephant",
         choices: ["E", "F", "L"],
         answer: "E",
-        hint: "E is for Elephant! Hear /eh/ at the start. 🐘",
+        hint: "E is for Elephant! Hear e at the start. 🐘",
         letter: "E",
         soundExamples: [
           { label: "E", word: "elephant" },
@@ -111,7 +111,7 @@ export const LEARNING_LEVELS = [
         pictureLabel: "Fish",
         choices: ["F", "P", "T"],
         answer: "F",
-        hint: "Blow gentle air for /f/: Fish starts with F! 🐠",
+        hint: "Blow gentle air for f: Fish starts with F! 🐠",
         letter: "F",
         soundExamples: [
           { label: "F", word: "fish" },
@@ -139,7 +139,7 @@ export const LEARNING_LEVELS = [
         pictureLabel: "Moon",
         choices: ["M", "W", "N"],
         answer: "M",
-        hint: "Press your lips together for /m/: Moon starts with M! 🌙",
+        hint: "Press your lips together for m: Moon starts with M! 🌙",
         letter: "M",
         soundExamples: [
           { label: "M", word: "moon" },
@@ -163,72 +163,72 @@ export const LEARNING_LEVELS = [
     description: "Listen to the letter sound and match it with its picture friend.",
     questions: [
       {
-        prompt: "Which word begins with the gentle /m/ sound?",
+        prompt: "Which word begins with the gentle m sound?",
         picture: "🌙",
-        pictureLabel: "Listen for /m/",
+        pictureLabel: "Listen for m",
         choices: ["Moon", "Cat", "Sun"],
         answer: "Moon",
-        hint: "Mmm-moon! Your lips gently touch for /m/. 🌙",
+        hint: "Mmm-moon! Your lips gently touch for m. 🌙",
         soundExamples: [
-          { label: "/m/", word: "moon" },
-          { label: "/k/", word: "cat" },
-          { label: "/s/", word: "sun" }
+          { label: "m", word: "moon" },
+          { label: "c", word: "cat" },
+          { label: "s", word: "sun" }
         ]
       },
       {
-        prompt: "Tap the picture that begins with the sunny /s/ sound.",
+        prompt: "Tap the picture that begins with the sunny s sound.",
         picture: "☀️",
-        pictureLabel: "Listen for /s/",
+        pictureLabel: "Listen for s",
         choices: ["Sun", "Dog", "Pig"],
         answer: "Sun",
         hint: "Stretch the sound like gentle breeze: sssss-sun! ☀️",
         soundExamples: [
-          { label: "/s/", word: "sun" },
-          { label: "/d/", word: "dog" },
-          { label: "/p/", word: "pig" }
+          { label: "s", word: "sun" },
+          { label: "d", word: "dog" },
+          { label: "p", word: "pig" }
         ]
       },
       {
-        prompt: "Which word starts with the bouncy /b/ pop sound?",
+        prompt: "Which word starts with the bouncy b pop sound?",
         picture: "⚽",
-        pictureLabel: "Listen for /b/",
+        pictureLabel: "Listen for b",
         choices: ["Ball", "Dog", "Fish"],
         answer: "Ball",
         hint: "B is a bouncy bubble pop: b-b-ball! ⚽",
         soundExamples: [
-          { label: "/b/", word: "ball" },
-          { label: "/d/", word: "dog" },
-          { label: "/f/", word: "fish" }
+          { label: "b", word: "ball" },
+          { label: "d", word: "dog" },
+          { label: "f", word: "fish" }
         ]
       },
       {
-        prompt: "Listen: /d/ as in Dog. Which word starts with /d/?",
+        prompt: "Listen: d as in Dog. Which word starts with d?",
         picture: "🐶",
-        pictureLabel: "Listen for /d/",
+        pictureLabel: "Listen for d",
         choices: ["Dog", "Ball", "Cat"],
         answer: "Dog",
-        hint: "Tap your tongue behind your teeth: /d/ /d/ Dog! 🐶",
+        hint: "Tap your tongue behind your teeth: d d Dog! 🐶",
         soundExamples: [
-          { label: "/d/", word: "dog" },
-          { label: "/b/", word: "ball" },
-          { label: "/k/", word: "cat" }
+          { label: "d", word: "dog" },
+          { label: "b", word: "ball" },
+          { label: "c", word: "cat" }
         ]
       },
       {
-        prompt: "Which word begins with the quick puff /p/?",
+        prompt: "Which word begins with the quick puff p?",
         picture: "🐷",
-        pictureLabel: "Listen for /p/",
+        pictureLabel: "Listen for p",
         choices: ["Pig", "Apple", "Leaf"],
         answer: "Pig",
         hint: "P is a light puff of air: p-p-pig! 🐷",
         soundExamples: [
-          { label: "/p/", word: "pig" },
-          { label: "/a/", word: "apple" },
-          { label: "/l/", word: "leaf" }
+          { label: "p", word: "pig" },
+          { label: "a", word: "apple" },
+          { label: "l", word: "leaf" }
         ]
       },
       {
-        prompt: "Which letter makes the gentle /l/ sound in Leaf?",
+        prompt: "Which letter makes the gentle l sound in Leaf?",
         picture: "🍃",
         pictureLabel: "Leaf",
         choices: ["L", "M", "T"],
@@ -256,87 +256,87 @@ export const LEARNING_LEVELS = [
     description: "Hear each individual sound, then smoothly slide them together into a whole word.",
     questions: [
       {
-        prompt: "Slide /c/ /a/ /t/ together. What word does it make?",
+        prompt: "Slide c - a - t together. What word does it make?",
         picture: "🐱",
         pictureLabel: "A furry cat",
         choices: ["Cat", "Cup", "Cot"],
         answer: "Cat",
         hint: "Say the sounds smoothly: c... a... t... Cat! 🐱",
-        blendParts: ["/c/", "/a/", "/t/"],
+        blendParts: ["c", "a", "t"],
         soundExamples: [
-          { label: "/c/", word: "cat" },
-          { label: "/a/", word: "apple" },
-          { label: "/t/", word: "top" }
+          { label: "c", word: "cat" },
+          { label: "a", word: "apple" },
+          { label: "t", word: "top" }
         ]
       },
       {
-        prompt: "Put these sounds together: /s/ /u/ /n/.",
+        prompt: "Put these sounds together: s - u - n.",
         picture: "☀️",
         pictureLabel: "Sunny sun",
         choices: ["Sun", "Sit", "Sap"],
         answer: "Sun",
         hint: "Slide them: sss-uuu-nnn... Sun! ☀️",
-        blendParts: ["/s/", "/u/", "/n/"],
+        blendParts: ["s", "u", "n"],
         soundExamples: [
-          { label: "/s/", word: "sun" },
-          { label: "/u/", word: "up" },
-          { label: "/n/", word: "nest" }
+          { label: "s", word: "sun" },
+          { label: "u", word: "up" },
+          { label: "n", word: "nest" }
         ]
       },
       {
-        prompt: "Blend /d/ /o/ /g/. What friendly friend is it?",
+        prompt: "Blend d - o - g. What friendly friend is it?",
         picture: "🐶",
         pictureLabel: "A waggy dog",
         choices: ["Dog", "Dig", "Dot"],
         answer: "Dog",
         hint: "Say each sound: d... o... g... Dog! 🐶",
-        blendParts: ["/d/", "/o/", "/g/"],
+        blendParts: ["d", "o", "g"],
         soundExamples: [
-          { label: "/d/", word: "dog" },
-          { label: "/o/", word: "octopus" },
-          { label: "/g/", word: "grapes" }
+          { label: "d", word: "dog" },
+          { label: "o", word: "octopus" },
+          { label: "g", word: "grapes" }
         ]
       },
       {
-        prompt: "Where do we sleep? Blend: /b/ /e/ /d/.",
+        prompt: "Where do we sleep? Blend: b - e - d.",
         picture: "🛏️",
         pictureLabel: "Cozy bed",
         choices: ["Bed", "Bad", "Bug"],
         answer: "Bed",
         hint: "b... e... d... Bed! A cozy place to rest. 🛏️",
-        blendParts: ["/b/", "/e/", "/d/"],
+        blendParts: ["b", "e", "d"],
         soundExamples: [
-          { label: "/b/", word: "ball" },
-          { label: "/e/", word: "elephant" },
-          { label: "/d/", word: "dog" }
+          { label: "b", word: "ball" },
+          { label: "e", word: "elephant" },
+          { label: "d", word: "dog" }
         ]
       },
       {
-        prompt: "Blend /p/ /i/ /g/. Which pink animal is this?",
+        prompt: "Blend p - i - g. Which pink animal is this?",
         picture: "🐷",
         pictureLabel: "Little piggy",
         choices: ["Pig", "Peg", "Pug"],
         answer: "Pig",
         hint: "p... i... g... Pig! Oink oink. 🐷",
-        blendParts: ["/p/", "/i/", "/g/"],
+        blendParts: ["p", "i", "g"],
         soundExamples: [
-          { label: "/p/", word: "pig" },
-          { label: "/i/", word: "in" },
-          { label: "/g/", word: "go" }
+          { label: "p", word: "pig" },
+          { label: "i", word: "in" },
+          { label: "g", word: "go" }
         ]
       },
       {
-        prompt: "Blend /b/ /u/ /g/. What tiny crawler is this?",
+        prompt: "Blend b - u - g. What tiny crawler is this?",
         picture: "🐞",
         pictureLabel: "Little ladybug",
         choices: ["Bug", "Bag", "Big"],
         answer: "Bug",
         hint: "b... u... g... Bug! A friendly little ladybug. 🐞",
-        blendParts: ["/b/", "/u/", "/g/"],
+        blendParts: ["b", "u", "g"],
         soundExamples: [
-          { label: "/b/", word: "ball" },
-          { label: "/u/", word: "up" },
-          { label: "/g/", word: "go" }
+          { label: "b", word: "ball" },
+          { label: "u", word: "up" },
+          { label: "g", word: "go" }
         ]
       }
     ]

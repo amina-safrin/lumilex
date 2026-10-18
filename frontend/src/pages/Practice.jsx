@@ -683,24 +683,27 @@ export default function Practice() {
                 ) : currentQuestion.blendParts ? (
                   /* Sound Blending Phoneme Tiles */
                   <div className="blend-tiles-box">
-                    {currentQuestion.blendParts.map((part, pIdx) => (
-                      <div key={pIdx} style={{ display: "inline-flex", alignItems: "center", gap: "10px" }}>
-                        <button
-                          type="button"
-                          className="blend-phoneme-tile"
-                          onClick={() => {
-                            playTapSound();
-                            speakText(part.replace(/\//g, ""));
-                          }}
-                          title={`Hear ${part}`}
-                        >
-                          {part}
-                        </button>
-                        {pIdx < currentQuestion.blendParts.length - 1 && (
-                          <span className="blend-arrow">➔</span>
-                        )}
-                      </div>
-                    ))}
+                    {currentQuestion.blendParts.map((part, pIdx) => {
+                      const cleanPart = String(part).replace(/\//g, "");
+                      return (
+                        <div key={pIdx} style={{ display: "inline-flex", alignItems: "center", gap: "10px" }}>
+                          <button
+                            type="button"
+                            className="blend-phoneme-tile"
+                            onClick={() => {
+                              playTapSound();
+                              speakText(cleanPart);
+                            }}
+                            title={`Hear ${cleanPart}`}
+                          >
+                            {cleanPart}
+                          </button>
+                          {pIdx < currentQuestion.blendParts.length - 1 && (
+                            <span className="blend-arrow">➔</span>
+                          )}
+                        </div>
+                      );
+                    })}
                     <span className="blend-arrow">➔</span>
                     <button
                       type="button"

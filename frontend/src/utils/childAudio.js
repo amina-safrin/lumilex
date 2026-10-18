@@ -401,10 +401,10 @@ export function speakCompoundWord(firstWord, secondWord, combinedWord) {
 
 /**
  * Phoneme sound breakdown
- * e.g., "/c/ /a/ /t/" -> "c... a... t... Cat!"
+ * e.g., ["c", "a", "t"] -> "c... a... t... Cat!"
  */
 export function speakPhonemeBlend(phonemes, wholeWord) {
-  const cleanPhonemes = phonemes.join("... ");
+  const cleanPhonemes = (phonemes || []).map((p) => String(p).replace(/\//g, "")).join("... ");
   const text = `${cleanPhonemes}... ${wholeWord}!`;
   speakText(text, { rate: 0.7, pitch: 1.1 });
 }
