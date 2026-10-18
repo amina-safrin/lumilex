@@ -1,819 +1,443 @@
-/* ================================
-   STORY LIBRARY PAGE
-================================ */
+/* =========================================================
+   STORY LIBRARY PAGE (RICH CHILD-FRIENDLY DYSLEXIA INTERFACE)
+   ========================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Nunito:wght@700;800;900&display=swap');
 
 .story-library {
   min-height: 100vh;
-
-  background: #f5f7f1;
-
-  color: #293b34;
-
+  background-color: var(--theme-bg, #f4f6f0);
+  color: var(--theme-text-main, #203626);
   font-family: "DM Sans", sans-serif;
-
-  padding-bottom: 60px;
-
-  font-synthesis: none;
-
-  text-rendering: optimizeLegibility;
+  padding-bottom: 80px;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-
-/* ================================
+/* =========================================================
    HEADER
-================================ */
-
+   ========================================================= */
 .story-header {
   min-height: 80px;
-
-  background: white;
-
-  border-bottom: 1px solid #e2e8df;
-
+  background: var(--theme-header-bg, #ffffff);
+  border-bottom: 2px solid var(--theme-border, #e2e8df);
   display: flex;
-
   align-items: center;
-
-  padding: 0 50px;
-
-  position: relative;
+  justify-content: space-between;
+  padding: 16px 36px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  gap: 16px;
 }
 
-
-/* ================================
-   BACK BUTTON
-================================ */
-
 .back-button {
-  display: flex;
-
+  display: inline-flex;
   align-items: center;
-
   gap: 8px;
-
-  border: none;
-
-  background: transparent;
-
-  color: #667568;
-
-  font-family: "DM Sans", sans-serif;
-
-  font-size: 14px;
-
+  border: 2px solid var(--theme-border, #d8e2d5);
+  background: var(--theme-surface, #ffffff);
+  color: var(--theme-text-main, #203626);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 14px;
   cursor: pointer;
-
-  padding: 10px;
-
-  transition: 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .back-button:hover {
-  color: #405344;
+  background: var(--theme-surface-subtle, #edf5ee);
+  transform: translateX(-2px);
 }
 
-
-/* ================================
-   HEADER TITLE
-================================ */
-
 .story-header-title {
-  position: absolute;
-
-  left: 50%;
-
-  transform: translateX(-50%);
-
   display: flex;
-
   align-items: center;
-
   gap: 12px;
 }
 
-.story-header-title svg {
-  color: #718a73;
+.library-logo-icon {
+  color: var(--theme-primary, #3d8053);
 }
 
 .story-header-title h1 {
   margin: 0;
-
+  font-size: 1.35rem;
+  font-weight: 800;
   font-family: "Nunito", sans-serif;
-
-  font-size: 23px;
-
-  font-weight: 700;
-
-  color: #304235;
 }
 
 .story-header-title p {
-  margin: 3px 0 0;
-
-  color: #7a887c;
-
-  font-family: "DM Sans", sans-serif;
-
-  font-size: 12px;
+  margin: 2px 0 0 0;
+  font-size: 0.86rem;
+  color: var(--theme-text-muted, #566f5c);
 }
 
-
-/* ================================
-   CREATE MY STORY HEADER BUTTON
-================================ */
-
 .create-story-link {
-  margin-left: auto;
-
-  border: none;
-
-  background: #718a73;
-
-  color: white;
-
-  border-radius: 12px;
-
-  padding: 11px 17px;
-
-  display: flex;
-
+  display: inline-flex;
   align-items: center;
-
   gap: 8px;
-
+  background: var(--theme-primary, #3d8053);
+  color: #ffffff;
+  border: none;
+  border-radius: 14px;
+  padding: 10px 20px;
+  font-size: 0.94rem;
+  font-weight: 800;
   cursor: pointer;
-
-  font-family: "DM Sans", sans-serif;
-
-  font-size: 14px;
-
-  font-weight: 600;
-
-  transition: 0.2s ease;
+  box-shadow: 0 4px 0 var(--theme-primary-shadow, #265535);
+  transition: all 0.16s ease;
 }
 
 .create-story-link:hover {
-  background: #617963;
-
-  transform: translateY(-1px);
+  background: var(--theme-primary-hover, #326d45);
+  transform: translateY(-2px);
 }
 
+/* =========================================================
+   HERO BANNER
+   ========================================================= */
+.library-hero-banner {
+  max-width: 1140px;
+  margin: 28px auto 20px auto;
+  padding: 32px 36px;
+  background: linear-gradient(135deg, var(--theme-surface-subtle, #edf5ee) 0%, var(--theme-surface, #ffffff) 100%);
+  border: 2px solid var(--theme-border, #d8e6d9);
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03);
+  gap: 24px;
+}
 
-/* ================================
-   INTRO
-================================ */
+.hero-banner-content {
+  flex: 1;
+}
 
-.story-intro {
-  max-width: 900px;
+.hero-tag {
+  display: inline-block;
+  background: var(--theme-chip-bg, #eaf4eb);
+  color: var(--theme-primary, #3d8053);
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
 
-  margin: 45px auto 30px;
+.hero-banner-content h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.6rem;
+  font-weight: 900;
+  font-family: "Nunito", sans-serif;
+  color: var(--theme-text-main, #203626);
+}
 
-  text-align: center;
+.hero-banner-content p {
+  margin: 0 0 20px 0;
+  font-size: 0.96rem;
+  color: var(--theme-text-muted, #566f5c);
+  max-width: 620px;
+  line-height: 1.5;
+}
 
+/* SEARCH BAR */
+.story-search-bar {
+  display: flex;
+  align-items: center;
+  background: var(--theme-surface, #ffffff);
+  border: 2px solid var(--theme-border, #d4e7d7);
+  border-radius: 16px;
+  padding: 10px 16px;
+  gap: 10px;
+  max-width: 520px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.2s ease;
+}
+
+.story-search-bar:focus-within {
+  border-color: var(--theme-primary, #3d8053);
+}
+
+.search-icon {
+  color: var(--theme-text-muted, #566f5c);
+  flex-shrink: 0;
+}
+
+.story-search-bar input {
+  border: none;
+  outline: none;
+  font-size: 0.98rem;
+  font-family: inherit;
+  background: transparent;
+  color: var(--theme-text-main, #203626);
+  width: 100%;
+}
+
+.clear-search-btn {
+  background: transparent;
+  border: none;
+  font-size: 0.9rem;
+  color: var(--theme-text-muted, #566f5c);
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.hero-mascot-circle {
+  font-size: 4rem;
+  width: 100px;
+  height: 100px;
+  background: var(--theme-surface, #ffffff);
+  border: 2px solid var(--theme-border, #d8e6d9);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+  animation: gentleBob 3s ease-in-out infinite alternate;
+}
+
+@keyframes gentleBob {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-8px); }
+}
+
+/* =========================================================
+   CATEGORY FILTER STRIP
+   ========================================================= */
+.story-content {
+  max-width: 1140px;
+  margin: 0 auto;
   padding: 0 20px;
 }
 
-.story-intro h2 {
-  margin: 0 0 10px;
-
-  font-family: "Nunito", sans-serif;
-
-  font-size: 30px;
-
-  font-weight: 800;
-
-  color: #304235;
-}
-
-.story-intro p {
-  margin: 0;
-
-  color: #758276;
-
-  font-family: "DM Sans", sans-serif;
-
-  font-size: 16px;
-
-  line-height: 1.7;
-}
-
-
-/* ================================
-   MAIN CONTENT
-================================ */
-
-.story-content {
-  width: 90%;
-
-  max-width: 1100px;
-
-  margin: auto;
-}
-
-
-/* ================================
-   SECTION HEADING
-================================ */
-
-.section-heading {
+.category-scroll-strip {
   display: flex;
-
-  justify-content: space-between;
-
-  align-items: center;
-
-  margin-bottom: 20px;
-}
-
-.section-heading h2 {
-  margin: 0 0 5px;
-
-  font-family: "Nunito", sans-serif;
-
-  font-size: 22px;
-
-  font-weight: 700;
-
-  color: #304235;
-}
-
-.section-heading p {
-  margin: 0;
-
-  color: #7b887d;
-
-  font-family: "DM Sans", sans-serif;
-
-  font-size: 14px;
-}
-
-
-/* ================================
-   CATEGORY FILTERS
-================================ */
-
-.category-filters {
-  display: flex;
-
   gap: 10px;
-
-  flex-wrap: wrap;
-
-  margin-bottom: 25px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  margin-bottom: 24px;
 }
 
-.category-button {
-  border: 1px solid #d9e2d6;
-
-  background: white;
-
-  color: #5d6d60;
-
-  padding: 9px 16px;
-
-  border-radius: 20px;
-
+.category-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--theme-surface, #ffffff);
+  border: 2px solid var(--theme-border, #d8e2d5);
+  padding: 10px 18px;
+  border-radius: 16px;
+  color: var(--theme-text-main, #203626);
+  font-weight: 700;
+  font-size: 0.92rem;
   cursor: pointer;
-
-  font-family: "DM Sans", sans-serif;
-
-  font-size: 13px;
-
-  font-weight: 500;
-
-  transition: 0.2s ease;
+  white-space: nowrap;
+  transition: all 0.16s ease;
 }
 
-.category-button:hover {
-  border-color: #a8b9a9;
-
-  background: #f8faf7;
+.category-pill-btn:hover {
+  border-color: var(--theme-primary, #3d8053);
+  transform: translateY(-2px);
+  background: var(--theme-surface-subtle, #edf5ee);
 }
 
-.category-button.active {
-  background: #718a73;
-
-  border-color: #718a73;
-
-  color: white;
-
-  font-weight: 600;
+.category-pill-btn.active {
+  background: var(--theme-primary, #3d8053);
+  border-color: var(--theme-primary, #3d8053);
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
+.category-pill-icon {
+  font-size: 1.1rem;
+}
 
-/* ================================
-   STORY GRID
-================================ */
+.category-pill-count {
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
 
+/* =========================================================
+   STORY CARDS GRID
+   ========================================================= */
 .story-grid {
   display: grid;
-
-  grid-template-columns: repeat(3, 1fr);
-
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 22px;
 }
 
-
-/* ================================
-   STORY CARD
-================================ */
-
-.story-card {
-  background: #fffdf8;
-
-  border: 1px solid #e1e7df;
-
-  border-radius: 20px;
-
-  padding: 24px;
-
-  cursor: pointer;
-
+.story-card.interactive-card {
+  background: var(--theme-surface, #ffffff);
+  border: 2px solid var(--theme-border, #e2e8df);
+  border-radius: 22px;
+  padding: 22px;
   display: flex;
-
   flex-direction: column;
-
-  min-height: 275px;
-
-  box-shadow:
-    0 5px 18px rgba(49, 67, 54, 0.05);
-
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
+  justify-content: space-between;
+  min-height: 290px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+  position: relative;
 }
 
-.story-card:hover {
-  transform: translateY(-4px);
-
-  border-color: #c5d1c3;
-
-  box-shadow:
-    0 12px 28px rgba(49, 67, 54, 0.09);
+.story-card.interactive-card:hover {
+  transform: translateY(-6px);
+  border-color: var(--theme-primary, #3d8053);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
 }
 
-
-/* ================================
-   STORY ICON
-================================ */
-
-.story-card-icon {
-  width: 65px;
-
-  height: 65px;
-
-  border-radius: 16px;
-
-  background: #e5eee3;
-
+.story-card-topbar {
   display: flex;
-
   align-items: center;
-
-  justify-content: center;
-
-  font-size: 34px;
-
-  margin-bottom: 17px;
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
 
+.story-topic-badge {
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 12px;
+  letter-spacing: 0.3px;
+}
 
-/* ================================
-   STORY CARD CONTENT
-================================ */
+.read-title-aloud-btn {
+  background: var(--theme-surface-subtle, #edf5ee);
+  border: 1px solid var(--theme-border, #d8e2d5);
+  border-radius: 10px;
+  padding: 6px 8px;
+  cursor: pointer;
+  color: var(--theme-primary, #3d8053);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
 
-.story-card-content {
+.read-title-aloud-btn:hover {
+  transform: scale(1.15);
+  background: var(--theme-chip-bg, #eaf4eb);
+}
+
+.story-card-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 75px;
+  background: var(--theme-surface-subtle, #f5faf6);
+  border-radius: 16px;
+  margin-bottom: 14px;
+}
+
+.story-cover-emoji {
+  font-size: 2.8rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.story-card.interactive-card:hover .story-cover-emoji {
+  transform: scale(1.18) rotate(4deg);
+}
+
+.story-card-body {
   flex: 1;
 }
 
-
-/* ================================
-   STORY TITLE
-================================ */
-
-.story-card-content h3 {
-  margin: 0 0 12px;
-
+.story-card-title {
+  margin: 0 0 8px 0;
+  font-size: 1.18rem;
+  font-weight: 800;
   font-family: "Nunito", sans-serif;
-
-  font-size: 18px;
-
-  line-height: 1.4;
-
-  font-weight: 700;
-
-  color: #304235;
+  color: var(--theme-text-main, #203626);
+  line-height: 1.35;
 }
 
+.story-card-snippet {
+  margin: 0 0 16px 0;
+  font-size: 0.9rem;
+  color: var(--theme-text-muted, #566f5c);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
-/* ================================
-   STORY DETAILS
-================================ */
-
-.story-details {
+.story-card-footer {
   display: flex;
-
   align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  border-top: 1px solid var(--theme-border, #edf2eb);
+}
 
-  gap: 8px;
+.story-meta-pill,
+.story-difficulty-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--theme-text-muted, #566f5c);
+}
 
-  flex-wrap: wrap;
+.story-start-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--theme-primary, #3d8053);
+  font-weight: 800;
+  font-size: 0.9rem;
+}
 
+.story-card.interactive-card:hover .story-start-cta {
+  transform: translateX(3px);
+}
+
+/* =========================================================
+   NO STORIES / LOADING STATE
+   ========================================================= */
+.no-stories-box {
+  background: var(--theme-surface, #ffffff);
+  border: 2px solid var(--theme-border, #e2e8df);
+  border-radius: 20px;
+  padding: 48px 24px;
+  text-align: center;
+  margin: 32px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.empty-emoji {
+  font-size: 3rem;
   margin-bottom: 12px;
 }
 
-.story-category,
-.story-level {
-  font-family: "DM Sans", sans-serif;
-
-  font-size: 11px;
-
-  font-weight: 500;
-
-  padding: 5px 9px;
-
-  border-radius: 10px;
-
-  background: #f0f4ed;
-
-  color: #647365;
-}
-
-.story-level {
-  background: #f7f5ea;
-
-  color: #7a7358;
-}
-
-
-/* ================================
-   STORY TIME
-================================ */
-
-.story-time {
-  display: flex;
-
-  align-items: center;
-
-  gap: 5px;
-
-  color: #859086;
-
-  font-family: "DM Sans", sans-serif;
-
-  font-size: 12px;
-}
-
-.story-time svg {
-  color: #718a73;
-}
-
-
-/* ================================
-   READ STORY BUTTON
-================================ */
-
-.read-story-button {
-  width: 100%;
-
-  border: 1px solid #cbd8c8;
-
-  background: #f8faf7;
-
-  color: #5d735f;
-
-  border-radius: 12px;
-
-  padding: 11px;
-
-  margin-top: 18px;
-
-  font-family: "DM Sans", sans-serif;
-
-  font-size: 13px;
-
-  font-weight: 600;
-
-  cursor: pointer;
-
-  transition: 0.2s ease;
-}
-
-.read-story-button:hover {
-  background: #edf3e9;
-
-  border-color: #a9baa9;
-
-  color: #4e725f;
-}
-
-
-/* ================================
-   NO STORIES
-================================ */
-
-.no-stories {
-  background: #fffdf8;
-
-  border: 1px solid #e1e7df;
-
-  border-radius: 20px;
-
-  padding: 50px 20px;
-
-  text-align: center;
-
-  color: #7a887c;
-
-  box-shadow:
-    0 5px 18px rgba(49, 67, 54, 0.04);
-}
-
-.no-stories svg {
-  color: #8da08e;
-
-  margin-bottom: 10px;
-}
-
-.no-stories h3 {
-  margin: 0 0 6px;
-
+.no-stories-box h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.3rem;
+  font-weight: 800;
   font-family: "Nunito", sans-serif;
-
-  color: #405344;
-
-  font-size: 18px;
-
-  font-weight: 700;
 }
 
-.no-stories p {
-  margin: 0;
-
-  font-family: "DM Sans", sans-serif;
-
-  font-size: 14px;
+.no-stories-box p {
+  margin: 0 0 20px 0;
+  color: var(--theme-text-muted, #566f5c);
+  font-size: 0.95rem;
 }
 
-
-/* ================================
-   CREATE MY STORY CARD
-================================ */
-
-.create-story-card {
-  margin-top: 35px;
-
-  background: #fffdf8;
-
-  border: 1px solid #dce5d9;
-
-  border-radius: 20px;
-
-  padding: 25px;
-
-  display: flex;
-
-  align-items: center;
-
-  gap: 20px;
-
-  box-shadow:
-    0 5px 18px rgba(49, 67, 54, 0.05);
-}
-
-
-/* ================================
-   CREATE STORY ICON
-================================ */
-
-.create-story-icon {
-  width: 58px;
-
-  height: 58px;
-
-  min-width: 58px;
-
-  border-radius: 15px;
-
-  background: #e5eee3;
-
-  color: #718a73;
-
-  display: flex;
-
-  align-items: center;
-
-  justify-content: center;
-}
-
-
-/* ================================
-   CREATE STORY INFORMATION
-================================ */
-
-.create-story-info {
-  flex: 1;
-}
-
-.create-story-info h2 {
-  margin: 0 0 7px;
-
-  font-family: "Nunito", sans-serif;
-
-  font-size: 19px;
-
-  color: #304235;
-
-  font-weight: 700;
-}
-
-.create-story-info p {
-  margin: 0;
-
-  color: #758276;
-
-  font-family: "DM Sans", sans-serif;
-
-  font-size: 13px;
-
-  line-height: 1.6;
-
-  max-width: 650px;
-}
-
-
-/* ================================
-   MAIN CREATE BUTTON
-================================ */
-
-.create-story-main-button {
+.reset-search-btn {
+  background: var(--theme-primary, #3d8053);
+  color: #ffffff;
   border: none;
-
-  background: #718a73;
-
-  color: white;
-
+  padding: 10px 22px;
   border-radius: 12px;
-
-  padding: 12px 18px;
-
-  white-space: nowrap;
-
-  display: flex;
-
-  align-items: center;
-
-  gap: 8px;
-
+  font-weight: 800;
   cursor: pointer;
-
-  font-family: "DM Sans", sans-serif;
-
-  font-size: 13px;
-
-  font-weight: 600;
-
-  transition: 0.2s ease;
-}
-
-.create-story-main-button:hover {
-  background: #617963;
-
-  transform: translateY(-1px);
-}
-
-
-/* ================================
-   RESPONSIVE
-================================ */
-
-@media (max-width: 1000px) {
-
-  .story-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .story-header {
-    padding: 0 30px;
-  }
-
-  .create-story-card {
-    align-items: flex-start;
-  }
-}
-
-
-@media (max-width: 700px) {
-
-  .story-header {
-    padding: 15px 20px;
-
-    min-height: 70px;
-  }
-
-  .story-header-title {
-    position: static;
-
-    transform: none;
-
-    margin-left: 15px;
-  }
-
-  .story-header-title h1 {
-    font-size: 18px;
-  }
-
-  .story-header-title p {
-    display: none;
-  }
-
-  .create-story-link {
-    padding: 10px;
-  }
-
-  .create-story-link {
-    font-size: 0;
-  }
-
-  .create-story-link svg {
-    font-size: initial;
-  }
-
-  .story-intro {
-    margin-top: 35px;
-  }
-
-  .story-intro h2 {
-    font-size: 25px;
-  }
-
-  .story-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .create-story-card {
-    flex-direction: column;
-
-    text-align: center;
-
-    align-items: center;
-  }
-
-  .create-story-info p {
-    max-width: 100%;
-  }
-
-  .create-story-main-button {
-    width: 100%;
-
-    justify-content: center;
-  }
-}
-
-
-@media (max-width: 450px) {
-
-  .story-header {
-    padding: 12px 15px;
-  }
-
-  .back-button {
-    font-size: 0;
-
-    padding: 8px;
-  }
-
-  .back-button svg {
-    font-size: initial;
-  }
-
-  .story-header-title {
-    margin-left: 5px;
-  }
-
-  .story-header-title h1 {
-    font-size: 16px;
-  }
-
-  .story-content {
-    width: 92%;
-  }
-
-  .category-filters {
-    gap: 7px;
-  }
-
-  .category-button {
-    padding: 8px 12px;
-
-    font-size: 12px;
-  }
-
-  .story-card {
-    padding: 19px;
-  }
 }
