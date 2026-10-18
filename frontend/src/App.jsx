@@ -10,6 +10,7 @@ import ChildProfile from "./pages/ChildProfile";
 import Dashboard from "./pages/Dashboard";
 import MyStories from "./pages/MyStories";
 import LearningJourney from "./pages/LearningJourney";
+import Settings from "./pages/Settings";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import { ChildProvider } from "./context/ChildContext";
@@ -46,6 +47,15 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
             </ProtectedRoute>
           }
         />

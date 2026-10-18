@@ -22,7 +22,6 @@ import { getLearningState, getGardenStage } from "../utils/learningRewards";
 import { getErrorTrackerState } from "../utils/errorTracker";
 
 import { useChild } from "../context/ChildContext";
-import ThemePicker from "../components/ThemePicker";
 
 function Dashboard() {
   const { userId } = useChild();
@@ -210,7 +209,10 @@ function Dashboard() {
 
         <div className="sidebar-bottom">
 
-          <button className="side-link">
+          <button
+            className="side-link"
+            onClick={() => navigate("/settings")}
+          >
             <Settings size={18} />
 
             <span>Settings</span>
@@ -310,11 +312,6 @@ function Dashboard() {
           <div className="dashboard-reward-item garden-reward"><span className="dashboard-reward-icon">{garden.emoji}</span><div><strong>{garden.name}</strong><small>{garden.description}</small></div></div>
           <button className="dashboard-reward-button" onClick={() => navigate("/learning-journey")}>Open learning journey <ArrowRight size={15} /></button>
         </section>
-
-        {/* =================================================
-            COMFORT THEME SELECTOR (CUSTOMIZED FOR EACH CHILD)
-        ================================================= */}
-        <ThemePicker />
 
         {/* =================================================
             TODAY'S ADVENTURE
