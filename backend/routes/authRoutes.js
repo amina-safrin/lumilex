@@ -238,6 +238,31 @@ router.post("/logout", (req, res) => {
 });
 
 // ======================================================
+// DELETE ACCOUNT
+// ======================================================
+
+router.delete("/account", async (req, res) => {
+  try {
+    const token = req.cookies.token;
+    if (!token) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
+    // Delete user (CASCADE deletes child_profiles, stories, learning_progress, learning_mistakes, child_preferences)
+    await pool.query("DELETE FROM userss WHERE id = $1", [userId]);
+
+    res.clearCookie("token");
+    return res.json({ message: "Account and all reading progress deleted successfully" });
+  } catch (error) {
+    console.error("Account deletion error:", error);
+    return res.status(500).json({ message: "Failed to delete account" });
+  }
+});
+
+// ======================================================
 // GOOGLE AUTHENTICATION
 // ======================================================
 

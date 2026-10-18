@@ -23,8 +23,27 @@ function getAudioContext() {
   return audioCtx;
 }
 
-// Global sound preference
+// Global sound preferences
 let soundsMuted = false;
+let soundVolume = 0.8; // 0.0 to 1.0
+
+export function getSoundVolume() {
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem("lumilex_sound_volume");
+    if (saved !== null) {
+      soundVolume = Math.max(0, Math.min(1, parseFloat(saved) || 0.8));
+    }
+  }
+  return soundVolume;
+}
+
+export function setSoundVolume(vol) {
+  soundVolume = Math.max(0, Math.min(1, parseFloat(vol)));
+  if (typeof window !== "undefined") {
+    localStorage.setItem("lumilex_sound_volume", String(soundVolume));
+  }
+  return soundVolume;
+}
 
 export function toggleMuteSounds() {
   soundsMuted = !soundsMuted;
@@ -291,7 +310,7 @@ export function speakText(text, options = {}) {
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.rate = options.rate || 0.74; // Slower pace for dyslexia processing
   utterance.pitch = options.pitch || 1.1; // Gentle, child-friendly pitch
-  utterance.volume = 1.0;
+  utterance.volume = getSoundVolume();
 
   const voice = getFriendlyVoice();
   if (voice) utterance.voice = voice;
