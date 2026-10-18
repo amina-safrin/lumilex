@@ -354,6 +354,58 @@ export function getFriendlyVoice() {
   return voices.find((v) => v.lang.startsWith("en")) || voices[0];
 }
 
+// ---------------------------------------------------------
+// Speech Synthesis (Slow, Patient, Dyslexia-Optimized)
+// ---------------------------------------------------------
+
+export function cleanTextForSpeech(input) {
+  if (!input) return "";
+  return String(input)
+    // Remove emojis so TTS does not read out descriptions like "red apple" or "crescent moon"
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}]/gu, "")
+    // Remove slashes
+    .replace(/\//g, "")
+    // Remove leading dash on word families like "-at" or "-un"
+    .replace(/(^|\s)-([a-zA-Z]+)/g, "$1$2")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export const PHONIC_SOUNDS = {
+  a: "ah",
+  b: "buh",
+  c: "kuh",
+  d: "duh",
+  e: "eh",
+  f: "fff",
+  g: "guh",
+  h: "huh",
+  i: "ih",
+  j: "juh",
+  k: "kuh",
+  l: "lll",
+  m: "mmm",
+  n: "nnn",
+  o: "ah",
+  p: "puh",
+  q: "kwuh",
+  r: "rrr",
+  s: "sss",
+  t: "tuh",
+  u: "uh",
+  v: "vvv",
+  w: "wuh",
+  x: "ks",
+  y: "yuh",
+  z: "zzz",
+};
+
+export function speakPhonicSound(letter) {
+  const char = String(letter).trim().toLowerCase().replace(/[^a-z]/g, "");
+  const sound = PHONIC_SOUNDS[char] || char;
+  speakText(sound, { rate: 0.72, pitch: 1.1 });
+}
+
 /**
  * Speak any word or phrase with patient, clear cadence
  */
@@ -362,9 +414,10 @@ export function speakText(text, options = {}) {
   if (isSoundsMuted()) return;
 
   window.speechSynthesis.cancel();
-  if (!text) return;
+  const cleaned = cleanTextForSpeech(text);
+  if (!cleaned) return;
 
-  const utterance = new SpeechSynthesisUtterance(text);
+  const utterance = new SpeechSynthesisUtterance(cleaned);
   utterance.rate = options.rate || 0.74; // Slower pace for dyslexia processing
   utterance.pitch = options.pitch || 1.1; // Gentle, child-friendly pitch
   utterance.volume = getSoundVolume();
@@ -381,11 +434,11 @@ export function speakText(text, options = {}) {
 
 /**
  * Special pronunciation for letter and its mnemonic image
- * e.g., letter "A", word "Apple" -> "A is for Apple. /a/ Apple."
+ * e.g., letter "A", word "Apple" -> "A is for Apple. Apple!"
  */
 export function speakLetterMnemonic(letter, word, pictureEmoji = "") {
   const cleanLetter = String(letter).trim().toUpperCase();
-  const cleanWord = String(word).trim();
+  const cleanWord = cleanTextForSpeech(word);
   const text = `${cleanLetter}! ${cleanLetter} is for ${cleanWord}. ${cleanWord}!`;
   speakText(text, { rate: 0.72, pitch: 1.12 });
 }
@@ -395,16 +448,23 @@ export function speakLetterMnemonic(letter, word, pictureEmoji = "") {
  * e.g., "Honey" + "Bee" = "Honeybee"
  */
 export function speakCompoundWord(firstWord, secondWord, combinedWord) {
-  const text = `${firstWord}... plus ${secondWord}... makes ${combinedWord}!`;
+  const w1 = cleanTextForSpeech(firstWord);
+  const w2 = cleanTextForSpeech(secondWord);
+  const combo = cleanTextForSpeech(combinedWord);
+  const text = `${w1}... plus ${w2}... makes ${combo}!`;
   speakText(text, { rate: 0.72, pitch: 1.12 });
 }
 
 /**
  * Phoneme sound breakdown
- * e.g., ["c", "a", "t"] -> "c... a... t... Cat!"
+ * e.g., ["c", "a", "t"] -> "kuh... ah... tuh... Cat!"
  */
 export function speakPhonemeBlend(phonemes, wholeWord) {
-  const cleanPhonemes = (phonemes || []).map((p) => String(p).replace(/\//g, "")).join("... ");
-  const text = `${cleanPhonemes}... ${wholeWord}!`;
-  speakText(text, { rate: 0.7, pitch: 1.1 });
+  const cleanPhonemes = (phonemes || []).map((p) => {
+    const char = String(p).trim().toLowerCase().replace(/[^a-z]/g, "");
+    return PHONIC_SOUNDS[char] || char;
+  }).join("... ");
+  const cleanWhole = cleanTextForSpeech(wholeWord);
+  const text = `${cleanPhonemes}... ${cleanWhole}!`;
+  speakText(text, { rate: 0.68, pitch: 1.1 });
 }

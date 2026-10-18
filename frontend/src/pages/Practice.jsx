@@ -43,6 +43,7 @@ import {
   playCelebrationFanfare,
   playGemEarnedSound,
   speakText,
+  speakPhonicSound,
   speakLetterMnemonic,
   speakCompoundWord,
   speakPhonemeBlend,
@@ -336,7 +337,8 @@ export default function Practice() {
     setShowHint(next);
     if (next && currentQuestion?.hint) {
       playHintSound();
-      speakText(currentQuestion.hint, { rate: 0.74, pitch: 1.1 });
+      const textToSpeak = currentQuestion.hintSpeech || currentQuestion.hint;
+      speakText(textToSpeak, { rate: 0.74, pitch: 1.1 });
     }
   };
 
@@ -692,7 +694,7 @@ export default function Practice() {
                             className="blend-phoneme-tile"
                             onClick={() => {
                               playTapSound();
-                              speakText(cleanPart);
+                              speakPhonicSound(cleanPart);
                             }}
                             title={`Hear ${cleanPart}`}
                           >

@@ -42,6 +42,7 @@ export const LEARNING_LEVELS = [
         choices: ["A", "B", "C"],
         answer: "A",
         hint: "Say apple slowly: a-pple. A is for Apple! 🍎",
+        hintSpeech: "Apple starts with the short ah sound. A is for Apple!",
         letter: "A",
         soundExamples: [
           { label: "A", word: "apple" },
@@ -56,6 +57,7 @@ export const LEARNING_LEVELS = [
         choices: ["B", "D", "P"],
         answer: "B",
         hint: "B has a big bouncy belly in front, just like a Ball! b as in Ball. ⚽",
+        hintSpeech: "B has a big bouncy belly in front, just like a Ball! Buh as in Ball.",
         letter: "B",
         soundExamples: [
           { label: "B", word: "ball" },
@@ -70,6 +72,7 @@ export const LEARNING_LEVELS = [
         choices: ["C", "S", "O"],
         answer: "C",
         hint: "Letter C is curved like a cozy sleeping cat! c as in Cat. 🐱",
+        hintSpeech: "Letter C is curved like a cozy sleeping cat! Kuh as in Cat.",
         letter: "C",
         soundExamples: [
           { label: "C", word: "cat" },
@@ -84,6 +87,7 @@ export const LEARNING_LEVELS = [
         choices: ["D", "B", "T"],
         answer: "D",
         hint: "Letter D has its round tummy on the left, waiting for a pet! d as in Dog. 🐶",
+        hintSpeech: "Letter D has its round tummy on the left, waiting for a pet! Duh as in Dog.",
         letter: "D",
         soundExamples: [
           { label: "D", word: "dog" },
@@ -98,6 +102,7 @@ export const LEARNING_LEVELS = [
         choices: ["E", "F", "L"],
         answer: "E",
         hint: "E is for Elephant! Hear e at the start. 🐘",
+        hintSpeech: "E is for Elephant! Hear the eh sound at the start.",
         letter: "E",
         soundExamples: [
           { label: "E", word: "elephant" },
@@ -112,6 +117,7 @@ export const LEARNING_LEVELS = [
         choices: ["F", "P", "T"],
         answer: "F",
         hint: "Blow gentle air for f: Fish starts with F! 🐠",
+        hintSpeech: "Blow gentle air for fff: Fish starts with F!",
         letter: "F",
         soundExamples: [
           { label: "F", word: "fish" },
@@ -126,6 +132,7 @@ export const LEARNING_LEVELS = [
         choices: ["S", "C", "Z"],
         answer: "S",
         hint: "S curves like sunshine: sss-sun! ☀️",
+        hintSpeech: "S curves like sunshine: sss, sun! S is for Sun.",
         letter: "S",
         soundExamples: [
           { label: "S", word: "sun" },
@@ -140,6 +147,7 @@ export const LEARNING_LEVELS = [
         choices: ["M", "W", "N"],
         answer: "M",
         hint: "Press your lips together for m: Moon starts with M! 🌙",
+        hintSpeech: "Press your lips together for mmm: Moon starts with M!",
         letter: "M",
         soundExamples: [
           { label: "M", word: "moon" },
@@ -169,6 +177,7 @@ export const LEARNING_LEVELS = [
         choices: ["Moon", "Cat", "Sun"],
         answer: "Moon",
         hint: "Mmm-moon! Your lips gently touch for m. 🌙",
+        hintSpeech: "Mmm, moon! Your lips gently touch to make the mmm sound. Moon starts with M!",
         soundExamples: [
           { label: "m", word: "moon" },
           { label: "c", word: "cat" },
@@ -182,6 +191,7 @@ export const LEARNING_LEVELS = [
         choices: ["Sun", "Dog", "Pig"],
         answer: "Sun",
         hint: "Stretch the sound like gentle breeze: sssss-sun! ☀️",
+        hintSpeech: "Stretch the sound like a gentle breeze: sss, sun! Sun starts with S.",
         soundExamples: [
           { label: "s", word: "sun" },
           { label: "d", word: "dog" },
@@ -195,6 +205,7 @@ export const LEARNING_LEVELS = [
         choices: ["Ball", "Dog", "Fish"],
         answer: "Ball",
         hint: "B is a bouncy bubble pop: b-b-ball! ⚽",
+        hintSpeech: "B is a bouncy bubble pop: buh, buh, ball! Ball starts with B.",
         soundExamples: [
           { label: "b", word: "ball" },
           { label: "d", word: "dog" },
@@ -208,6 +219,7 @@ export const LEARNING_LEVELS = [
         choices: ["Dog", "Ball", "Cat"],
         answer: "Dog",
         hint: "Tap your tongue behind your teeth: d d Dog! 🐶",
+        hintSpeech: "Tap your tongue behind your teeth: duh, duh, Dog! Dog starts with D.",
         soundExamples: [
           { label: "d", word: "dog" },
           { label: "b", word: "ball" },
@@ -221,6 +233,7 @@ export const LEARNING_LEVELS = [
         choices: ["Pig", "Apple", "Leaf"],
         answer: "Pig",
         hint: "P is a light puff of air: p-p-pig! 🐷",
+        hintSpeech: "P is a light puff of air: puh, puh, pig! Pig starts with P.",
         soundExamples: [
           { label: "p", word: "pig" },
           { label: "a", word: "apple" },
@@ -234,6 +247,7 @@ export const LEARNING_LEVELS = [
         choices: ["L", "M", "T"],
         answer: "L",
         hint: "Llll-leaf. Lift your tongue up for L! 🍃",
+        hintSpeech: "Lll, leaf. Lift your tongue up to make the lll sound in leaf!",
         soundExamples: [
           { label: "L", word: "leaf" },
           { label: "M", word: "moon" },
@@ -262,6 +276,7 @@ export const LEARNING_LEVELS = [
         choices: ["Cat", "Cup", "Cot"],
         answer: "Cat",
         hint: "Say the sounds smoothly: c... a... t... Cat! 🐱",
+        hintSpeech: "Say the sounds smoothly: kuh... ah... tuh... Cat!",
         blendParts: ["c", "a", "t"],
         soundExamples: [
           { label: "c", word: "cat" },
@@ -276,6 +291,7 @@ export const LEARNING_LEVELS = [
         choices: ["Sun", "Sit", "Sap"],
         answer: "Sun",
         hint: "Slide them: sss-uuu-nnn... Sun! ☀️",
+        hintSpeech: "Slide the sounds together: sss... uh... nnn... Sun!",
         blendParts: ["s", "u", "n"],
         soundExamples: [
           { label: "s", word: "sun" },
@@ -290,6 +306,7 @@ export const LEARNING_LEVELS = [
         choices: ["Dog", "Dig", "Dot"],
         answer: "Dog",
         hint: "Say each sound: d... o... g... Dog! 🐶",
+        hintSpeech: "Say each sound: duh... ah... guh... Dog!",
         blendParts: ["d", "o", "g"],
         soundExamples: [
           { label: "d", word: "dog" },
@@ -304,6 +321,7 @@ export const LEARNING_LEVELS = [
         choices: ["Bed", "Bad", "Bug"],
         answer: "Bed",
         hint: "b... e... d... Bed! A cozy place to rest. 🛏️",
+        hintSpeech: "buh... eh... duh... Bed! A cozy place to rest.",
         blendParts: ["b", "e", "d"],
         soundExamples: [
           { label: "b", word: "ball" },
@@ -318,6 +336,7 @@ export const LEARNING_LEVELS = [
         choices: ["Pig", "Peg", "Pug"],
         answer: "Pig",
         hint: "p... i... g... Pig! Oink oink. 🐷",
+        hintSpeech: "puh... ih... guh... Pig! Oink oink.",
         blendParts: ["p", "i", "g"],
         soundExamples: [
           { label: "p", word: "pig" },
@@ -332,6 +351,7 @@ export const LEARNING_LEVELS = [
         choices: ["Bug", "Bag", "Big"],
         answer: "Bug",
         hint: "b... u... g... Bug! A friendly little ladybug. 🐞",
+        hintSpeech: "buh... uh... guh... Bug! A friendly little ladybug.",
         blendParts: ["b", "u", "g"],
         soundExamples: [
           { label: "b", word: "ball" },
@@ -361,6 +381,7 @@ export const LEARNING_LEVELS = [
         choices: ["Bat", "Dog", "Sun"],
         answer: "Bat",
         hint: "Cat and Bat both end in -at! 🐱🦇",
+        hintSpeech: "Cat and Bat both rhyme because they end in at!",
         family: "-at",
         soundExamples: [
           { label: "cat", word: "cat" },
@@ -375,6 +396,7 @@ export const LEARNING_LEVELS = [
         choices: ["Run", "Map", "Bed"],
         answer: "Run",
         hint: "Sun and Run have the same happy -un ending! ☀️🏃",
+        hintSpeech: "Sun and Run rhyme with the un sound at the end!",
         family: "-un",
         soundExamples: [
           { label: "sun", word: "sun" },
@@ -389,6 +411,7 @@ export const LEARNING_LEVELS = [
         choices: ["Frog", "Fish", "Pig"],
         answer: "Frog",
         hint: "Dog and Frog both end in -og! 🐶🐸",
+        hintSpeech: "Dog and Frog rhyme with the og sound at the end!",
         family: "-og",
         soundExamples: [
           { label: "dog", word: "dog" },
@@ -403,6 +426,7 @@ export const LEARNING_LEVELS = [
         choices: ["Mug", "Cat", "Sun"],
         answer: "Mug",
         hint: "Bug and Mug end in -ug! 🐞☕",
+        hintSpeech: "Bug and Mug rhyme with the ug sound at the end!",
         family: "-ug",
         soundExamples: [
           { label: "bug", word: "bug" },
@@ -417,6 +441,7 @@ export const LEARNING_LEVELS = [
         choices: ["Mop", "Car", "Tree"],
         answer: "Mop",
         hint: "Hop and Mop both share the bouncy -op sound! 🐰🧹",
+        hintSpeech: "Hop and Mop rhyme with the op sound at the end!",
         family: "-op",
         soundExamples: [
           { label: "hop", word: "hop" },
@@ -453,6 +478,7 @@ export const LEARNING_LEVELS = [
         choices: ["Honeybee", "Sunbee", "Honeycat"],
         answer: "Honeybee",
         hint: "Sweet Honey 🍯 plus busy Bee 🐝 makes Honeybee! 🍯🐝",
+        hintSpeech: "Sweet Honey plus busy Bee makes Honeybee!",
         soundExamples: [
           { label: "Honey", word: "honey" },
           { label: "Bee", word: "bee" },
@@ -472,6 +498,7 @@ export const LEARNING_LEVELS = [
         choices: ["Rainbow", "Raindrop", "Sunbow"],
         answer: "Rainbow",
         hint: "Rain 🌧️ plus Bow 🌈 creates a beautiful Rainbow in the sky! 🌈",
+        hintSpeech: "Rain plus Bow creates a beautiful Rainbow in the sky!",
         soundExamples: [
           { label: "Rain", word: "rain" },
           { label: "Bow", word: "bow" },
@@ -491,6 +518,7 @@ export const LEARNING_LEVELS = [
         choices: ["Sunflower", "Sunrain", "Moonflower"],
         answer: "Sunflower",
         hint: "Warm Sun ☀️ plus Flower 🌻 gives us a tall Sunflower! 🌻",
+        hintSpeech: "Warm Sun plus Flower gives us a tall Sunflower!",
         soundExamples: [
           { label: "Sun", word: "sun" },
           { label: "Flower", word: "flower" },
@@ -510,6 +538,7 @@ export const LEARNING_LEVELS = [
         choices: ["Starfish", "Goldfish", "Jellyfish"],
         answer: "Starfish",
         hint: "Star ⭐ plus Fish 🐟 makes a sea Starfish! ⭐🐟",
+        hintSpeech: "Star plus Fish makes a sea Starfish!",
         soundExamples: [
           { label: "Star", word: "star" },
           { label: "Fish", word: "fish" },
@@ -529,6 +558,7 @@ export const LEARNING_LEVELS = [
         choices: ["Butterfly", "Dragonfly", "Firefly"],
         answer: "Butterfly",
         hint: "Butter 🧈 plus Fly 🪰 makes a colorful Butterfly! 🦋",
+        hintSpeech: "Butter plus Fly makes a colorful Butterfly!",
         soundExamples: [
           { label: "Butter", word: "butter" },
           { label: "Fly", word: "fly" },
@@ -548,6 +578,7 @@ export const LEARNING_LEVELS = [
         choices: ["Cupcake", "Pancake", "Cheesecake"],
         answer: "Cupcake",
         hint: "A tiny Cake baked in a Cup is a Cupcake! 🧁",
+        hintSpeech: "A tiny Cake baked in a Cup is a Cupcake!",
         soundExamples: [
           { label: "Cup", word: "cup" },
           { label: "Cake", word: "cake" },
@@ -567,6 +598,7 @@ export const LEARNING_LEVELS = [
         choices: ["Snowman", "Rainman", "Iceman"],
         answer: "Snowman",
         hint: "Fluffy Snow ❄️ rolled together makes a cheerful Snowman! ⛄",
+        hintSpeech: "Fluffy Snow rolled together makes a cheerful Snowman!",
         soundExamples: [
           { label: "Snow", word: "snow" },
           { label: "Man", word: "man" },
@@ -586,6 +618,7 @@ export const LEARNING_LEVELS = [
         choices: ["Sandcastle", "Sandhouse", "Beachhouse"],
         answer: "Sandcastle",
         hint: "Building in the Sand 🏖️ creates a magnificent Sandcastle! 🏰",
+        hintSpeech: "Building in the Sand creates a magnificent Sandcastle!",
         soundExamples: [
           { label: "Sand", word: "sand" },
           { label: "Castle", word: "castle" },
@@ -613,7 +646,8 @@ export const LEARNING_LEVELS = [
         pictureLabel: "Cat in the sun",
         choices: ["In the sun", "In the car", "In a tree"],
         answer: "In the sun",
-        hint: "Look at the last words: ‘in the sun’. ☀️"
+        hint: "Look at the last words: ‘in the sun’. ☀️",
+        hintSpeech: "Look at the last words: in the sun."
       },
       {
         prompt: "‘The little puppy has a red ball.’ What color is the ball?",
@@ -621,7 +655,8 @@ export const LEARNING_LEVELS = [
         pictureLabel: "Puppy with a ball",
         choices: ["Red", "Blue", "Green"],
         answer: "Red",
-        hint: "The story says: ‘a red ball’. 🔴"
+        hint: "The story says: ‘a red ball’. 🔴",
+        hintSpeech: "The story says: a red ball."
       },
       {
         prompt: "‘A honeybee visits a yellow sunflower.’ Who visits the flower?",
@@ -629,7 +664,8 @@ export const LEARNING_LEVELS = [
         pictureLabel: "Bee and sunflower",
         choices: ["A honeybee", "A sleepy frog", "A big whale"],
         answer: "A honeybee",
-        hint: "Our combination friend from Level 5: a honeybee! 🐝"
+        hint: "Our combination friend from Level 5: a honeybee! 🐝",
+        hintSpeech: "Our combination friend: a honeybee!"
       },
       {
         prompt: "‘Ben puts on a yellow raincoat.’ What might the weather be?",
@@ -637,7 +673,8 @@ export const LEARNING_LEVELS = [
         pictureLabel: "Rainy day",
         choices: ["Rainy", "Very hot", "Snowy"],
         answer: "Rainy",
-        hint: "Raincoats keep us dry when it rains! 🌧️"
+        hint: "Raincoats keep us dry when it rains! 🌧️",
+        hintSpeech: "Raincoats keep us dry when it rains!"
       },
       {
         prompt: "‘The rabbit shares a crunchy carrot with a friend.’ What does this show?",
@@ -645,7 +682,8 @@ export const LEARNING_LEVELS = [
         pictureLabel: "Sharing friend",
         choices: ["Kindness", "Anger", "Sleepiness"],
         answer: "Kindness",
-        hint: "Sharing with a friend shows warm kindness! 💚"
+        hint: "Sharing with a friend shows warm kindness! 💚",
+        hintSpeech: "Sharing with a friend shows warm kindness!"
       }
     ]
   }
