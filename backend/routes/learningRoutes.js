@@ -42,35 +42,24 @@ router.get("/state", authenticateToken, async (req, res) => {
       [userId]
     );
 
-    let dailyBonusAwarded = false;
-    let dailyBonusGems = 0;
+    let canClaimDailyReward = false;
+    let dailyRewardGems = 5;
 
     if (prefRes.rows.length === 0) {
       // Welcome bonus of 20 gems for creating an account in LumiLex!
       const initPref = await pool.query(
         `INSERT INTO child_preferences (user_id, theme, streak_days, last_practice_date, last_daily_bonus_date, perfect_lessons, gems, recent_accuracies)
-         VALUES ($1, 'forest', 0, NULL, $2, 0, 20, '[]'::jsonb)
+         VALUES ($1, 'forest', 0, NULL, NULL, 0, 20, '[]'::jsonb)
          RETURNING theme, streak_days, last_practice_date, last_daily_bonus_date, perfect_lessons, gems, recent_accuracies`,
-        [userId, today]
+        [userId]
       );
       prefRes = initPref;
+      canClaimDailyReward = true;
     } else {
-      // Check if child is coming to learn on a new day (Daily learning gems bonus!)
+      // Check if child has an unclaimed daily learning bonus for today
       const prefRow = prefRes.rows[0];
       if (prefRow.last_daily_bonus_date !== today) {
-        dailyBonusAwarded = true;
-        dailyBonusGems = 5;
-        const updatedGems = (prefRow.gems ?? 0) + dailyBonusGems;
-        
-        await pool.query(
-          `UPDATE child_preferences
-           SET gems = $1, last_daily_bonus_date = $2, updated_at = CURRENT_TIMESTAMP
-           WHERE user_id = $3`,
-          [updatedGems, today, userId]
-        );
-
-        prefRow.gems = updatedGems;
-        prefRow.last_daily_bonus_date = today;
+        canClaimDailyReward = true;
       }
     }
 
@@ -125,11 +114,12 @@ router.get("/state", authenticateToken, async (req, res) => {
         gems: pref.gems ?? 0,
         recentAccuracies: pref.recent_accuracies || [],
       },
-      dailyBonus: dailyBonusAwarded
+      dailyReward: canClaimDailyReward
         ? {
-            awarded: true,
-            gems: dailyBonusGems,
-            message: "🌟 Daily Learning Bonus: +5 Gems for learning today!",
+            available: true,
+            gems: dailyRewardGems,
+            title: "Daily Learning Gift",
+            message: "You showed up to learn today! Claim your sparkly gems.",
           }
         : null,
       mistakes: mistakesMap,
@@ -137,6 +127,59 @@ router.get("/state", authenticateToken, async (req, res) => {
   } catch (error) {
     console.error("Error fetching child learning state:", error);
     return res.status(500).json({ message: "Failed to fetch learning state" });
+  }
+});
+
+// =========================================================
+// POST /api/learning/claim-daily-reward
+// Claims the +5 gems daily reward and marks today as claimed
+// =========================================================
+router.post("/claim-daily-reward", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const today = new Date().toISOString().split("T")[0];
+
+    const prefRes = await pool.query(
+      `SELECT gems, last_daily_bonus_date FROM child_preferences WHERE user_id = $1`,
+      [userId]
+    );
+
+    let currentGems = 0;
+    let lastBonusDate = null;
+    if (prefRes.rows.length > 0) {
+      currentGems = prefRes.rows[0].gems ?? 0;
+      lastBonusDate = prefRes.rows[0].last_daily_bonus_date;
+    }
+
+    if (lastBonusDate === today) {
+      return res.json({
+        alreadyClaimed: true,
+        gems: currentGems,
+        message: "Daily reward already claimed today!",
+      });
+    }
+
+    const rewardGems = 5;
+    const newGems = currentGems + rewardGems;
+
+    await pool.query(
+      `INSERT INTO child_preferences (user_id, gems, last_daily_bonus_date, updated_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+       ON CONFLICT (user_id) DO UPDATE SET
+         gems = EXCLUDED.gems,
+         last_daily_bonus_date = EXCLUDED.last_daily_bonus_date,
+         updated_at = CURRENT_TIMESTAMP`,
+      [userId, newGems, today]
+    );
+
+    return res.json({
+      success: true,
+      gemsClaimed: rewardGems,
+      totalGems: newGems,
+    });
+  } catch (error) {
+    console.error("Error claiming daily reward:", error);
+    return res.status(500).json({ message: "Failed to claim daily reward" });
   }
 });
 

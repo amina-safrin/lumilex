@@ -23,7 +23,7 @@ import {
 import { getLearningState, getGardenStage, setLearningStateLocally } from "../utils/learningRewards";
 import { getErrorTrackerState, setErrorTrackerLocally } from "../utils/errorTracker";
 import { useChild } from "../context/ChildContext";
-import { playTapSound, speakText } from "../utils/childAudio";
+import { playTapSound, speakText, playCelebrationFanfare, playGemEarnedSound } from "../utils/childAudio";
 import "./Dashboard.css";
 
 // Topic emojis and soft background badges for child-friendly visual appeal
@@ -80,7 +80,9 @@ function Dashboard() {
   const [errorTracker, setErrorTracker] = useState(() => getErrorTrackerState(userId));
   const [stories, setStories] = useState([]);
   const [loadingStories, setLoadingStories] = useState(true);
-  const [dailyBonusNotice, setDailyBonusNotice] = useState(null);
+  const [dailyRewardModal, setDailyRewardModal] = useState(null);
+  const [isClaimingReward, setIsClaimingReward] = useState(false);
+  const [rewardClaimed, setRewardClaimed] = useState(false);
 
   useEffect(() => {
     const refreshRewards = () => {
@@ -153,8 +155,9 @@ function Dashboard() {
             setErrorTracker(stateData.preferences);
             setErrorTrackerLocally(stateData.preferences, currentUid);
           }
-          if (stateData.dailyBonus?.awarded) {
-            setDailyBonusNotice(stateData.dailyBonus);
+          if (stateData.dailyReward?.available) {
+            setDailyRewardModal(stateData.dailyReward);
+            playCelebrationFanfare();
           }
         }
 
@@ -178,6 +181,44 @@ function Dashboard() {
 
     loadData();
   }, [userId]);
+
+  const handleClaimDailyReward = async () => {
+    try {
+      setIsClaimingReward(true);
+      playGemEarnedSound();
+      const res = await fetch("http://localhost:5000/api/learning/claim-daily-reward", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRewardClaimed(true);
+        if (data.totalGems !== undefined) {
+          setErrorTracker((prev) => ({ ...prev, gems: data.totalGems }));
+          setErrorTrackerLocally(
+            {
+              gems: data.totalGems,
+              lastDailyBonusDate: new Date().toISOString().split("T")[0],
+            },
+            userId
+          );
+        }
+        setTimeout(() => {
+          setDailyRewardModal(null);
+          setRewardClaimed(false);
+          setIsClaimingReward(false);
+        }, 1200);
+      } else {
+        setIsClaimingReward(false);
+        setDailyRewardModal(null);
+      }
+    } catch (e) {
+      console.warn("Failed to claim daily reward:", e);
+      setIsClaimingReward(false);
+      setDailyRewardModal(null);
+    }
+  };
 
   // =====================================================
   // RECOMMENDATIONS BASED ON CHILD'S INTERESTS
@@ -454,22 +495,78 @@ function Dashboard() {
 
         </header>
 
-        {/* DAILY LEARNING BONUS BANNER */}
-        {dailyBonusNotice && (
-          <div className="daily-gems-banner">
-            <span className="daily-gems-emoji">💎</span>
-            <div className="daily-gems-text">
-              <strong>Daily Learning Reward!</strong>
-              <p>You received +{dailyBonusNotice.gems} gems for coming to learn today! ✨</p>
+        {/* DAILY REWARD CLAIM POPUP MODAL */}
+        {dailyRewardModal && (
+          <div className="daily-reward-overlay" role="dialog" aria-modal="true">
+            <div className="daily-reward-modal-card">
+              {/* Playful Floating Sparkles */}
+              <div className="modal-sparkle sparkle-tl">✨</div>
+              <div className="modal-sparkle sparkle-tr">✦</div>
+              <div className="modal-sparkle sparkle-bl">🎉</div>
+              <div className="modal-sparkle sparkle-br">⭐</div>
+
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => {
+                  playTapSound();
+                  setDailyRewardModal(null);
+                }}
+                title="Close"
+              >
+                ✕
+              </button>
+
+              {/* Glowing animated gem */}
+              <div className="reward-modal-gem-ring">
+                <div className={`reward-modal-gem ${rewardClaimed ? "gem-claimed" : ""}`}>
+                  💎
+                </div>
+              </div>
+
+              <span className="reward-modal-eyebrow">
+                <Sparkles size={14} />
+                DAILY LEARNING GIFT
+              </span>
+
+              <h2>Welcome Back, {childName}! 🌟</h2>
+
+              <p className="reward-modal-desc">
+                You showed up to learn today! Claim your sparkly star crystals to keep growing your reading powers.
+              </p>
+
+              <div className="reward-gem-amount-badge">
+                <span className="gem-plus">+{dailyRewardModal.gems || 5}</span>
+                <span className="gem-text">Star Gems 💎</span>
+              </div>
+
+              <button
+                type="button"
+                className={`reward-claim-main-btn ${rewardClaimed ? "claimed" : ""}`}
+                onClick={handleClaimDailyReward}
+                disabled={isClaimingReward || rewardClaimed}
+              >
+                <Sparkles size={18} />
+                <span>
+                  {rewardClaimed
+                    ? "Claimed! +5 Gems Added 🎉"
+                    : isClaimingReward
+                    ? "Collecting Crystals..."
+                    : "Claim Daily Reward 💎"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className="reward-modal-later-link"
+                onClick={() => {
+                  playTapSound();
+                  setDailyRewardModal(null);
+                }}
+              >
+                I'll claim later
+              </button>
             </div>
-            <button
-              type="button"
-              className="daily-gems-dismiss-btn"
-              onClick={() => setDailyBonusNotice(null)}
-              title="Dismiss"
-            >
-              ✕
-            </button>
           </div>
         )}
 
