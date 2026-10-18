@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   Sparkles,
@@ -59,9 +59,9 @@ function CreateStory() {
   };
 
   // ============================================
-  // STORY SELECTIONS
-  // ============================================
-  const [selectedInterests, setSelectedInterests] = useState(["Animals"]);
+  const location = useLocation();
+  const initialInterest = location.state?.interest ? [location.state.interest] : ["Animals"];
+  const [selectedInterests, setSelectedInterests] = useState(initialInterest);
   const [selectedCharacter, setSelectedCharacter] = useState("Me");
   const [characterName, setCharacterName] = useState("");
   const [selectedMood, setSelectedMood] = useState("Happy");

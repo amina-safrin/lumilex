@@ -20,12 +20,11 @@ import {
   Volume2,
   Clock,
 } from "lucide-react";
-import "./Dashboard.css";
 import { getLearningState, getGardenStage } from "../utils/learningRewards";
 import { getErrorTrackerState } from "../utils/errorTracker";
-import { playTapSound, speakText } from "../utils/childAudio";
-
 import { useChild } from "../context/ChildContext";
+import { playTapSound, speakText } from "../utils/childAudio";
+import "./Dashboard.css";
 
 // Topic emojis and soft background badges for child-friendly visual appeal
 const TOPIC_METADATA = {
@@ -39,41 +38,35 @@ const TOPIC_METADATA = {
   Science: { icon: "🔬", color: "#3b82f6", bg: "#eff6ff" },
 };
 
-const INTEREST_KEYWORDS = {
-  Animals: ["animal", "animals", "rabbit", "fox", "bear", "cat", "dog", "owl", "seahorse", "kangaroo", "otter", "bird", "bluebird", "puppy", "finley"],
-  Space: ["space", "moon", "star", "rocket", "planet", "galaxy", "astronaut", "fairies", "sky"],
-  Adventure: ["adventure", "brave", "treasure", "quest", "journey", "explore", "secret", "captain", "race", "hop"],
-  Nature: ["nature", "garden", "forest", "tree", "treehouse", "brook", "flower", "rainbow", "cloud", "river", "sunflower", "pebble", "lake"],
-  Fantasy: ["fantasy", "dragon", "magic", "fairy", "fairies", "cloud", "lemonade", "castle"],
-  Science: ["science", "space", "star", "rocket", "moon", "planet", "nature", "tree", "water", "brook", "explorer", "lemonade"],
-  Friendship: ["friendship", "friend", "share", "shared", "together", "kindness", "bakes", "pie", "friendly"],
-};
-
 function getStoryEmoji(story) {
   const t = ((story.title || "") + " " + (story.topic || "")).toLowerCase();
   if (t.includes("owl")) return "🦉";
   if (t.includes("cloud") || t.includes("lemonade")) return "☁️";
-  if (t.includes("bear") || t.includes("honey") || t.includes("pie")) return "🐻";
-  if (t.includes("rocket") || t.includes("space") || t.includes("moon")) return "🚀";
-  if (t.includes("seahorse") || t.includes("pearl") || t.includes("ocean")) return "🐡";
+  if (t.includes("bear") || t.includes("honey")) return "🐻";
+  if (t.includes("rocket") || t.includes("space") || t.includes("planet") || t.includes("moon")) return "🚀";
+  if (t.includes("seahorse") || t.includes("pearl") || t.includes("ocean") || t.includes("sea")) return "🐡";
   if (t.includes("dragon")) return "🐲";
   if (t.includes("kangaroo") || t.includes("hop")) return "🦘";
-  if (t.includes("brook") || t.includes("pebble") || t.includes("boat")) return "⛵";
+  if (t.includes("brook") || t.includes("pebble") || t.includes("river")) return "⛵";
   if (t.includes("otter") || t.includes("treasure")) return "🦦";
-  if (t.includes("picnic") || t.includes("forest") || t.includes("garden")) return "🌿";
-  if (t.includes("cat")) return "🐱";
+  if (t.includes("picnic") || t.includes("forest") || t.includes("tree")) return "🧺";
+  if (t.includes("cat") || t.includes("kitten")) return "🐱";
   if (t.includes("bee") || t.includes("sunflower")) return "🐝";
-  if (t.includes("star")) return "⭐";
-  if (t.includes("rabbit")) return "🐰";
+  if (t.includes("star") || t.includes("galaxy")) return "⭐";
+  if (t.includes("rabbit") || t.includes("bunny")) return "🐰";
   if (t.includes("dog") || t.includes("puppy")) return "🐶";
   if (t.includes("fox")) return "🦊";
-  if (t.includes("treehouse") || t.includes("tree")) return "🌳";
-  if (t.includes("captain") || t.includes("adventure")) return "🧭";
+  if (t.includes("lion")) return "🦁";
+  if (t.includes("dinosaur") || t.includes("dino")) return "🦖";
+  if (t.includes("wizard") || t.includes("magic") || t.includes("wand")) return "🪄";
+  if (t.includes("robot")) return "🤖";
+  if (t.includes("science")) return "🔬";
+  if (t.includes("adventure") || t.includes("explore")) return "🧭";
   return "📖";
 }
 
 function estimateReadingMinutes(content) {
-  if (!content) return 2;
+  if (!content) return 1;
   const wordCount = content.trim().split(/\s+/).length;
   return Math.max(1, Math.ceil(wordCount / 65));
 }
@@ -86,8 +79,7 @@ function Dashboard() {
   const [rewards, setRewards] = useState(() => getLearningState(userId));
   const [errorTracker, setErrorTracker] = useState(() => getErrorTrackerState(userId));
   const [stories, setStories] = useState([]);
-  const [storiesLoading, setStoriesLoading] = useState(true);
-  const [selectedInterestFilter, setSelectedInterestFilter] = useState("ALL");
+  const [loadingStories, setLoadingStories] = useState(true);
 
   useEffect(() => {
     const refreshRewards = () => {
@@ -111,6 +103,8 @@ function Dashboard() {
   useEffect(() => {
     async function loadData() {
       try {
+        setLoadingStories(true);
+
         const userResponse = await fetch(
           "http://localhost:5000/api/auth/me",
           {
@@ -149,12 +143,107 @@ function Dashboard() {
       } catch (error) {
         console.error("Dashboard loading error:", error);
       } finally {
-        setStoriesLoading(false);
+        setLoadingStories(false);
       }
     }
 
     loadData();
   }, []);
+
+  // =====================================================
+  // RECOMMENDATIONS BASED ON CHILD'S INTERESTS
+  // =====================================================
+
+  const childInterests = useMemo(() => {
+    return profile?.interests || [];
+  }, [profile?.interests]);
+
+  // Match interest logic
+  const getMatchingInterest = (story) => {
+    if (!childInterests || childInterests.length === 0) return null;
+    const text = ((story.topic || "") + " " + (story.title || "")).toLowerCase();
+    for (const interest of childInterests) {
+      const lowerInt = interest.toLowerCase();
+      if (text.includes(lowerInt)) {
+        return interest;
+      }
+      if (
+        lowerInt === "science" &&
+        (text.includes("space") ||
+          text.includes("rocket") ||
+          text.includes("star") ||
+          text.includes("planet") ||
+          text.includes("moon"))
+      ) {
+        return interest;
+      }
+      if (
+        lowerInt === "nature" &&
+        (text.includes("forest") ||
+          text.includes("cloud") ||
+          text.includes("tree") ||
+          text.includes("brook") ||
+          text.includes("lemonade"))
+      ) {
+        return interest;
+      }
+    }
+    return null;
+  };
+
+  const recommendedStories = useMemo(() => {
+    if (!stories.length) return [];
+
+    const libraryStories = stories.filter(
+      (s) => s.story_type === "library" || !s.story_type
+    );
+
+    if (childInterests.length === 0) {
+      // Default to top 4 library stories if child hasn't chosen interests yet
+      return libraryStories.slice(0, 4).map((s) => ({
+        ...s,
+        matchedInterest: null,
+      }));
+    }
+
+    const matched = [];
+    const unmatched = [];
+
+    // Prioritize library stories that match the child's interests
+    libraryStories.forEach((story) => {
+      const match = getMatchingInterest(story);
+      if (match) {
+        matched.push({ ...story, matchedInterest: match });
+      } else {
+        unmatched.push({ ...story, matchedInterest: null });
+      }
+    });
+
+    // If matches exist, show them up to 4, filling with others if fewer than 4
+    if (matched.length > 0) {
+      if (matched.length < 4) {
+        return [...matched, ...unmatched.slice(0, 4 - matched.length)];
+      }
+      return matched.slice(0, 4);
+    }
+
+    // Fallback if no direct match found
+    return libraryStories.slice(0, 4).map((s) => ({
+      ...s,
+      matchedInterest: null,
+    }));
+  }, [stories, childInterests]);
+
+  const handleReadStory = (storyId) => {
+    playTapSound();
+    navigate(`/story/${storyId}`);
+  };
+
+  const handleSpeakTitle = (e, title) => {
+    e.stopPropagation();
+    playTapSound();
+    speakText(title);
+  };
 
   // =====================================================
   // LOGOUT
@@ -177,101 +266,10 @@ function Dashboard() {
   }
 
   // =====================================================
-  // CHILD NAME & PERSONALIZED STORY SUGGESTIONS
+  // CHILD NAME
   // =====================================================
 
   const childName = profile?.child_name || "Reader";
-
-  const childInterests = useMemo(() => {
-    if (!profile?.interests) return [];
-    if (Array.isArray(profile.interests)) return profile.interests;
-    return [profile.interests];
-  }, [profile?.interests]);
-
-  const libraryStories = useMemo(() => {
-    return stories.filter((s) => s.story_type === "library");
-  }, [stories]);
-
-  const suggestedStories = useMemo(() => {
-    if (!libraryStories.length) return [];
-
-    // Score stories based on child interests
-    const scored = libraryStories.map((story) => {
-      let score = 0;
-      let matchedInterest = null;
-
-      const storyTopic = (story.topic || "").toLowerCase();
-      const storyTitle = (story.title || "").toLowerCase();
-      const storyContent = (story.content || "").toLowerCase();
-
-      for (const interest of childInterests) {
-        const interestLower = interest.toLowerCase();
-        const keywords = INTEREST_KEYWORDS[interest] || [interestLower];
-
-        // 1. Direct topic match
-        if (
-          storyTopic === interestLower ||
-          storyTopic.includes(interestLower) ||
-          interestLower.includes(storyTopic)
-        ) {
-          score += 20;
-          if (!matchedInterest) matchedInterest = interest;
-        }
-
-        // 2. Keyword match in title
-        for (const kw of keywords) {
-          if (storyTitle.includes(kw)) {
-            score += 10;
-            if (!matchedInterest) matchedInterest = interest;
-          }
-          if (storyContent.includes(kw)) {
-            score += 2;
-            if (!matchedInterest) matchedInterest = interest;
-          }
-        }
-      }
-
-      return {
-        ...story,
-        matchScore: score,
-        matchedInterest: matchedInterest || story.topic || "Adventure",
-        isMatched: score > 0,
-      };
-    });
-
-    // If an interest filter tab is selected by the child
-    if (selectedInterestFilter !== "ALL") {
-      const selLower = selectedInterestFilter.toLowerCase();
-      const kws = INTEREST_KEYWORDS[selectedInterestFilter] || [selLower];
-      const filtered = scored.filter((s) => {
-        const sTopic = (s.topic || "").toLowerCase();
-        const sTitle = (s.title || "").toLowerCase();
-        return (
-          s.matchedInterest?.toLowerCase() === selLower ||
-          sTopic.includes(selLower) ||
-          kws.some((kw) => sTitle.includes(kw))
-        );
-      });
-      return filtered.sort((a, b) => b.matchScore - a.matchScore).slice(0, 6);
-    }
-
-    // Default: ALL
-    if (childInterests.length > 0) {
-      const matched = scored
-        .filter((s) => s.matchScore > 0)
-        .sort((a, b) => b.matchScore - a.matchScore);
-
-      if (matched.length >= 6) {
-        return matched.slice(0, 6);
-      }
-      // Fill remainder with other beginner stories
-      const others = scored.filter((s) => s.matchScore === 0);
-      return [...matched, ...others].slice(0, 6);
-    }
-
-    // Fallback if no interests: top beginner stories
-    return scored.slice(0, 6);
-  }, [libraryStories, childInterests, selectedInterestFilter]);
 
   // =====================================================
   // DASHBOARD
@@ -680,294 +678,250 @@ function Dashboard() {
             RECOMMENDED STORIES BASED ON CHILD'S INTERESTS
         ================================================= */}
 
-        <section className="dashboard-story-suggestions">
-          <div className="suggestions-header">
-            <div className="suggestions-title-group">
-              <span className="suggestion-badge">
-                <Sparkles size={14} />
-                {childInterests.length > 0
-                  ? "Picked Just For You"
-                  : "Recommended Stories"}
-              </span>
+        <section className="dashboard-recommendations-section">
+
+          <div className="recommendations-header">
+
+            <div>
+
+              <div className="recommendations-eyebrow">
+                <Sparkles size={16} />
+                <span>RECOMMENDED FOR YOU</span>
+                {childInterests.length > 0 && (
+                  <span className="interests-pill-tag">
+                    {childInterests.slice(0, 3).join(" • ")}
+                  </span>
+                )}
+              </div>
 
               <h2>
-                {childInterests.length > 0 ? (
-                  <>Stories Based on What You Love 🌟</>
-                ) : (
-                  <>Explore Stories You'll Love 📖</>
-                )}
+                Stories You Might Love, {childName}! 📚
               </h2>
 
               <p>
                 {childInterests.length > 0 ? (
                   <>
-                    Hand-picked for <strong>{childName}</strong> based on your interest in{" "}
-                    <strong>{childInterests.join(", ")}</strong>! Tap any story to start reading.
+                    Handpicked stories matched to your love for{" "}
+                    <strong>{childInterests.join(", ")}</strong>. Choose one and dive into your adventure!
                   </>
                 ) : (
                   <>
-                    Hand-picked beginner adventures for <strong>{childName}</strong>. Select your favorite
-                    topics in{" "}
-                    <span
-                      className="settings-link"
-                      onClick={() => navigate("/settings")}
-                    >
-                      Settings
-                    </span>{" "}
-                    for personalized suggestions!
+                    Magical reading adventures hand-picked for you. You can customize your favorite topics anytime in Settings!
                   </>
                 )}
               </p>
+
             </div>
 
             <button
-              className="view-all-stories-btn"
+              className="view-library-button"
               onClick={() => {
                 playTapSound();
                 navigate("/stories");
               }}
             >
-              <span>Explore Library ({libraryStories.length || 22})</span>
+              <Library size={16} />
+              <span>Explore Story Library</span>
               <ArrowRight size={15} />
             </button>
+
           </div>
 
-          {/* Child's Selected Interest Filter Tabs (if child selected multiple interests) */}
-          {childInterests.length > 1 && (
-            <div className="interest-filter-pills">
-              <span className="interest-filter-label">Filter by:</span>
-
-              <button
-                type="button"
-                className={`interest-pill ${selectedInterestFilter === "ALL" ? "active" : ""}`}
-                onClick={() => {
-                  playTapSound();
-                  setSelectedInterestFilter("ALL");
-                }}
-              >
-                ✨ All My Picks
-              </button>
-
-              {childInterests.map((interest) => {
-                const meta = TOPIC_METADATA[interest] || { icon: "⭐" };
-                const isActive = selectedInterestFilter === interest;
-                return (
-                  <button
-                    key={interest}
-                    type="button"
-                    className={`interest-pill ${isActive ? "active" : ""}`}
-                    onClick={() => {
-                      playTapSound();
-                      setSelectedInterestFilter(interest);
-                    }}
-                  >
-                    <span>{meta.icon}</span>
-                    <span>{interest}</span>
-                  </button>
-                );
-              })}
+          {/* STORY CARDS GRID */}
+          {loadingStories ? (
+            <div className="recommendations-loading">
+              <span className="recommendation-spinner">✨</span>
+              <p>Finding stories matched to your interests...</p>
             </div>
-          )}
-
-          {/* Prompt banner if child has 0 interests selected */}
-          {childInterests.length === 0 && (
-            <div className="no-interests-banner">
-              <div className="no-interests-banner-text">
-                <Sparkles size={18} />
-                <span>
-                  Tell us what you like (Animals, Space, Adventure, Nature...) to get custom story picks!
-                </span>
-              </div>
-              <button
-                type="button"
-                className="no-interests-banner-btn"
-                onClick={() => {
-                  playTapSound();
-                  navigate("/settings");
-                }}
-              >
-                Choose Interests
-              </button>
-            </div>
-          )}
-
-          {/* Suggestions Grid */}
-          <div className="suggested-stories-grid">
-            {storiesLoading ? (
-              <>
-                <div className="suggestion-skeleton-card" />
-                <div className="suggestion-skeleton-card" />
-                <div className="suggestion-skeleton-card" />
-              </>
-            ) : suggestedStories.length > 0 ? (
-              suggestedStories.map((story) => {
-                const topicKey = story.topic || "Adventure";
-                const meta = TOPIC_METADATA[topicKey] || {
-                  icon: "✨",
-                  color: "#059669",
+          ) : recommendedStories.length > 0 ? (
+            <div className="recommendations-grid">
+              {recommendedStories.map((story) => {
+                const emoji = getStoryEmoji(story);
+                const readTime = estimateReadingMinutes(story.content);
+                const meta = TOPIC_METADATA[story.topic] || {
+                  icon: "📖",
+                  color: "#10b981",
                   bg: "#ecfdf5",
                 };
-                const emoji = getStoryEmoji(story);
-                const readingMinutes = estimateReadingMinutes(story.content);
+                const snippet = story.content
+                  ? story.content.split("\n")[0]
+                  : "A wonderful adventure waiting to be read.";
 
                 return (
                   <div
                     key={story.id}
-                    className="suggested-story-card"
-                    onClick={() => {
-                      playTapSound();
-                      navigate(`/story/${story.id}`);
-                    }}
+                    className="suggestion-story-card"
+                    onClick={() => handleReadStory(story.id)}
                   >
-                    {/* Visual Cover Header */}
-                    <div className="suggested-story-cover">
-                      <div className="suggested-story-cover-top">
+                    <div className="suggestion-card-topbar">
+                      <span
+                        className="suggestion-topic-badge"
+                        style={{
+                          backgroundColor: meta.bg,
+                          color: meta.color,
+                        }}
+                      >
+                        {meta.icon} {story.topic}
+                      </span>
+
+                      {story.matchedInterest ? (
                         <span
-                          className="suggested-topic-badge"
-                          style={{
-                            backgroundColor: meta.bg,
-                            color: meta.color,
-                          }}
+                          className="suggestion-match-badge"
+                          title={`Picked because you like ${story.matchedInterest}`}
                         >
-                          {meta.icon} {story.topic || "Adventure"}
+                          💖 For You
                         </span>
+                      ) : null}
 
-                        {story.isMatched && (
-                          <span className="suggested-match-pill">
-                            ★ Matches: {story.matchedInterest}
-                          </span>
-                        )}
-                      </div>
+                      <button
+                        type="button"
+                        className="suggestion-voice-btn"
+                        onClick={(e) => handleSpeakTitle(e, story.title)}
+                        title="Hear title aloud"
+                      >
+                        <Volume2 size={15} />
+                      </button>
+                    </div>
 
-                      <div className="suggested-story-emoji-center">
+                    <div className="suggestion-card-illustration">
+                      <div className="suggestion-emoji-avatar">
                         {emoji}
-                      </div>
-
-                      <div className="suggested-reading-time">
-                        <Clock size={11} />
-                        <span>{readingMinutes} min read</span>
                       </div>
                     </div>
 
-                    {/* Content Details */}
-                    <div className="suggested-story-body">
-                      <h4 className="suggested-story-title">{story.title}</h4>
-
-                      <p className="suggested-story-excerpt">
-                        {story.content
-                          ? story.content.slice(0, 95) + "..."
-                          : "A warm and gentle adventure crafted for beginning readers."}
+                    <div className="suggestion-card-body">
+                      <h3 className="suggestion-title">
+                        {story.title}
+                      </h3>
+                      <p className="suggestion-snippet">
+                        {snippet}
                       </p>
+                    </div>
 
-                      <div className="suggested-story-meta">
-                        <span className="suggested-difficulty-pill">
-                          {story.difficulty === "Intermediate"
-                            ? "🌟 Intermediate"
-                            : "🌱 Beginner"}
+                    <div className="suggestion-card-footer">
+                      <div className="suggestion-meta-tags">
+                        <span className="suggestion-meta-pill">
+                          <Clock size={12} />
+                          {readTime}m read
+                        </span>
+                        <span className="suggestion-difficulty-pill">
+                          <Target size={12} />
+                          {story.difficulty || "Beginner"}
                         </span>
                       </div>
 
-                      {/* Card Action Buttons */}
-                      <div className="suggested-card-footer">
-                        <button
-                          type="button"
-                          className="card-sound-btn"
-                          title="Listen to story title"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            speakText(story.title);
-                          }}
-                        >
-                          <Volume2 size={15} />
-                          <span>Listen</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          className="card-read-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            playTapSound();
-                            navigate(`/story/${story.id}`);
-                          }}
-                        >
-                          <span>Read</span>
-                          <ArrowRight size={15} />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        className="suggestion-read-cta"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleReadStory(story.id);
+                        }}
+                      >
+                        <span>Read</span>
+                        <ArrowRight size={13} />
+                      </button>
                     </div>
                   </div>
                 );
-              })
-            ) : (
-              <p>No story suggestions found right now.</p>
-            )}
+              })}
+            </div>
+          ) : (
+            <div className="recommendations-empty">
+              <p>No stories found. Head over to the Story Library to pick a book!</p>
+              <button
+                className="primary-button"
+                onClick={() => navigate("/stories")}
+              >
+                Go to Story Library <ArrowRight size={15} />
+              </button>
+            </div>
+          )}
+
+          {/* AI STORY CREATOR PROMPT & EXPLORE SHORTCUTS */}
+          <div className="recommendations-bottom-bar">
+
+            <div className="ai-story-callout">
+              <div className="ai-callout-icon">✨</div>
+              <div className="ai-callout-text">
+                <h4>
+                  {childInterests.length > 0
+                    ? `Want a brand new ${childInterests[0]} story?`
+                    : `Want a custom story made just for you?`}
+                </h4>
+                <p>
+                  Use our magical AI story maker to craft a new adventure starring {childName}!
+                </p>
+              </div>
+
+              <button
+                className="ai-create-shortcut-btn"
+                onClick={() => {
+                  playTapSound();
+                  navigate("/create-story", {
+                    state: {
+                      interest: childInterests[0] || "Animals",
+                    },
+                  });
+                }}
+              >
+                <Sparkles size={16} />
+                <span>
+                  Create {childInterests[0] || "AI"} Story
+                </span>
+                <ArrowRight size={15} />
+              </button>
+            </div>
+
+            {/* QUICK FEATURE NAVIGATION PILLS */}
+            <div className="dashboard-quick-links">
+              <button
+                className="quick-link-pill"
+                onClick={() => {
+                  playTapSound();
+                  navigate("/stories");
+                }}
+              >
+                <BookOpen size={16} />
+                <span>Story Library</span>
+              </button>
+
+              <button
+                className="quick-link-pill"
+                onClick={() => {
+                  playTapSound();
+                  navigate("/my-stories");
+                }}
+              >
+                <Sparkles size={16} />
+                <span>My AI Stories</span>
+              </button>
+
+              <button
+                className="quick-link-pill"
+                onClick={() => {
+                  playTapSound();
+                  navigate("/learning-journey");
+                }}
+              >
+                <Sprout size={16} />
+                <span>Learning Journey</span>
+              </button>
+
+              <button
+                className="quick-link-pill"
+                onClick={() => {
+                  playTapSound();
+                  navigate("/practice");
+                }}
+              >
+                <Dumbbell size={16} />
+                <span>Practice Skills</span>
+              </button>
+            </div>
+
           </div>
 
-          {/* Quick Navigation Toolbar */}
-          <div className="dashboard-quick-links">
-            <span className="dashboard-quick-links-label">Quick Links:</span>
-
-            <button
-              type="button"
-              className="quick-link-chip"
-              onClick={() => {
-                playTapSound();
-                navigate("/stories");
-              }}
-            >
-              <BookOpen size={15} />
-              <span>Story Library</span>
-            </button>
-
-            <button
-              type="button"
-              className="quick-link-chip"
-              onClick={() => {
-                playTapSound();
-                navigate("/my-stories");
-              }}
-            >
-              <Sparkles size={15} />
-              <span>My AI Stories</span>
-            </button>
-
-            <button
-              type="button"
-              className="quick-link-chip"
-              onClick={() => {
-                playTapSound();
-                navigate("/create-story");
-              }}
-            >
-              <Sparkles size={15} />
-              <span>Create Story</span>
-            </button>
-
-            <button
-              type="button"
-              className="quick-link-chip"
-              onClick={() => {
-                playTapSound();
-                navigate("/learning-journey");
-              }}
-            >
-              <Sprout size={15} />
-              <span>Learning Journey</span>
-            </button>
-
-            <button
-              type="button"
-              className="quick-link-chip"
-              onClick={() => {
-                playTapSound();
-                navigate("/practice");
-              }}
-            >
-              <Dumbbell size={15} />
-              <span>Practice Room</span>
-            </button>
-          </div>
         </section>
 
       </main>
