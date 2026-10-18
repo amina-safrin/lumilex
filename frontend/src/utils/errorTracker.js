@@ -15,10 +15,11 @@ function errorKey(userId) {
 
 const defaultErrorState = () => ({
   mistakes: {}, // key: itemIdentifier -> { count, lastSeen, category, questionData, mastered }
-  streakDays: 1,
-  lastPracticeDate: new Date().toISOString().split("T")[0],
+  streakDays: 0,
+  lastPracticeDate: null,
+  lastDailyBonusDate: null,
   perfectLessonsCount: 0,
-  gems: 10,
+  gems: 0,
   recentAccuracies: [],
 });
 
@@ -26,10 +27,37 @@ export function getErrorTrackerState(userId = null) {
   if (typeof window === "undefined") return defaultErrorState();
   try {
     const raw = localStorage.getItem(errorKey(userId));
-    return raw ? { ...defaultErrorState(), ...JSON.parse(raw) } : defaultErrorState();
+    if (!raw) return defaultErrorState();
+    const parsed = JSON.parse(raw);
+    const state = { ...defaultErrorState(), ...parsed };
+
+    // Check if streak lapsed (more than 1 day skipped)
+    const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    if (state.lastPracticeDate && state.lastPracticeDate !== today && state.lastPracticeDate !== yesterday) {
+      state.streakDays = 0;
+    }
+
+    return state;
   } catch (e) {
     return defaultErrorState();
   }
+}
+
+export function setErrorTrackerLocally(serverPref, userId = null) {
+  if (!serverPref) return getErrorTrackerState(userId);
+  const current = getErrorTrackerState(userId);
+  const merged = {
+    ...current,
+    streakDays: typeof serverPref.streakDays === "number" ? serverPref.streakDays : (typeof serverPref.streak_days === "number" ? serverPref.streak_days : current.streakDays),
+    lastPracticeDate: serverPref.lastPracticeDate ?? serverPref.last_practice_date ?? current.lastPracticeDate,
+    lastDailyBonusDate: serverPref.lastDailyBonusDate ?? serverPref.last_daily_bonus_date ?? current.lastDailyBonusDate,
+    perfectLessonsCount: typeof serverPref.perfectLessonsCount === "number" ? serverPref.perfectLessonsCount : (typeof serverPref.perfect_lessons === "number" ? serverPref.perfect_lessons : current.perfectLessonsCount),
+    gems: typeof serverPref.gems === "number" ? serverPref.gems : current.gems,
+    recentAccuracies: serverPref.recentAccuracies || serverPref.recent_accuracies || current.recentAccuracies,
+  };
+  saveErrorTrackerState(merged, userId);
+  return merged;
 }
 
 export function saveErrorTrackerState(state, userId = null) {
@@ -146,13 +174,13 @@ export function completeLessonSession({ accuracy, levelId, mistakesCount, userId
   const state = getErrorTrackerState(userId);
   const today = new Date().toISOString().split("T")[0];
 
-  // Update streak
+  // Update streak: 0 on the first day, 1 starts on the second day
   if (state.lastPracticeDate !== today) {
     const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
     if (state.lastPracticeDate === yesterday) {
-      state.streakDays += 1;
+      state.streakDays = (state.streakDays || 0) + 1;
     } else {
-      state.streakDays = 1;
+      state.streakDays = 0;
     }
     state.lastPracticeDate = today;
   }

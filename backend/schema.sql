@@ -75,10 +75,11 @@ CREATE TABLE IF NOT EXISTS child_preferences (
     id SERIAL PRIMARY KEY,
     user_id INTEGER UNIQUE REFERENCES userss(id) ON DELETE CASCADE,
     theme VARCHAR(50) DEFAULT 'forest',
-    streak_days INTEGER DEFAULT 1,
+    streak_days INTEGER DEFAULT 0,
     last_practice_date VARCHAR(20),
+    last_daily_bonus_date VARCHAR(20),
     perfect_lessons INTEGER DEFAULT 0,
-    gems INTEGER DEFAULT 10,
+    gems INTEGER DEFAULT 0,
     recent_accuracies JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

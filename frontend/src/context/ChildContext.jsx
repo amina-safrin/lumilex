@@ -5,6 +5,8 @@
 // =========================================================
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { setLearningStateLocally } from "../utils/learningRewards";
+import { setErrorTrackerLocally } from "../utils/errorTracker";
 
 const ChildContext = createContext({
   userId: null,
@@ -67,6 +69,14 @@ export function ChildProvider({ children }) {
             setThemeState(stateData.preferences.theme);
             localStorage.setItem(`lumilex_theme_${currentUserId}`, stateData.preferences.theme);
           }
+          if (stateData.progress) {
+            setLearningStateLocally(stateData.progress, currentUserId);
+          }
+          if (stateData.preferences) {
+            setErrorTrackerLocally(stateData.preferences, currentUserId);
+          }
+          // Notify any listening components on the page
+          window.dispatchEvent(new Event("storage"));
         } else {
           // Fallback to local storage cache for this user
           const cachedTheme = localStorage.getItem(`lumilex_theme_${currentUserId}`);

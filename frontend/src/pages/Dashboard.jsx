@@ -20,8 +20,8 @@ import {
   Volume2,
   Clock,
 } from "lucide-react";
-import { getLearningState, getGardenStage } from "../utils/learningRewards";
-import { getErrorTrackerState } from "../utils/errorTracker";
+import { getLearningState, getGardenStage, setLearningStateLocally } from "../utils/learningRewards";
+import { getErrorTrackerState, setErrorTrackerLocally } from "../utils/errorTracker";
 import { useChild } from "../context/ChildContext";
 import { playTapSound, speakText } from "../utils/childAudio";
 import "./Dashboard.css";
@@ -80,12 +80,14 @@ function Dashboard() {
   const [errorTracker, setErrorTracker] = useState(() => getErrorTrackerState(userId));
   const [stories, setStories] = useState([]);
   const [loadingStories, setLoadingStories] = useState(true);
+  const [dailyBonusNotice, setDailyBonusNotice] = useState(null);
 
   useEffect(() => {
     const refreshRewards = () => {
       setRewards(getLearningState(userId));
       setErrorTracker(getErrorTrackerState(userId));
     };
+    refreshRewards(); // Immediately sync when userId is available/changed
     window.addEventListener("storage", refreshRewards);
     window.addEventListener("focus", refreshRewards);
     return () => {
@@ -97,7 +99,7 @@ function Dashboard() {
   const garden = getGardenStage(rewards);
 
   // =====================================================
-  // LOAD USER + CHILD PROFILE + STORIES
+  // LOAD USER + CHILD PROFILE + STORIES + REWARDS
   // =====================================================
 
   useEffect(() => {
@@ -112,9 +114,13 @@ function Dashboard() {
           }
         );
 
+        let currentUid = userId;
         if (userResponse.ok) {
           const userData = await userResponse.json();
           setUser(userData.user);
+          if (userData.user?.id) {
+            currentUid = String(userData.user.id);
+          }
         }
 
         const profileResponse = await fetch(
@@ -127,6 +133,29 @@ function Dashboard() {
         if (profileResponse.ok) {
           const profileData = await profileResponse.json();
           setProfile(profileData.profile);
+        }
+
+        // Fetch authoritative learning progress, gems, streak, and check daily learning bonus
+        const stateResponse = await fetch(
+          "http://localhost:5000/api/learning/state",
+          {
+            credentials: "include",
+          }
+        );
+
+        if (stateResponse.ok) {
+          const stateData = await stateResponse.json();
+          if (stateData.progress) {
+            setRewards(stateData.progress);
+            setLearningStateLocally(stateData.progress, currentUid);
+          }
+          if (stateData.preferences) {
+            setErrorTracker(stateData.preferences);
+            setErrorTrackerLocally(stateData.preferences, currentUid);
+          }
+          if (stateData.dailyBonus?.awarded) {
+            setDailyBonusNotice(stateData.dailyBonus);
+          }
         }
 
         const storiesResponse = await fetch(
@@ -148,7 +177,7 @@ function Dashboard() {
     }
 
     loadData();
-  }, []);
+  }, [userId]);
 
   // =====================================================
   // RECOMMENDATIONS BASED ON CHILD'S INTERESTS
@@ -425,6 +454,25 @@ function Dashboard() {
 
         </header>
 
+        {/* DAILY LEARNING BONUS BANNER */}
+        {dailyBonusNotice && (
+          <div className="daily-gems-banner">
+            <span className="daily-gems-emoji">💎</span>
+            <div className="daily-gems-text">
+              <strong>Daily Learning Reward!</strong>
+              <p>You received +{dailyBonusNotice.gems} gems for coming to learn today! ✨</p>
+            </div>
+            <button
+              type="button"
+              className="daily-gems-dismiss-btn"
+              onClick={() => setDailyBonusNotice(null)}
+              title="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* =================================================
             STATS
         ================================================= */}
@@ -438,7 +486,11 @@ function Dashboard() {
             </div>
             <div>
               <strong>{errorTracker.streakDays} {errorTracker.streakDays === 1 ? "day" : "days"}</strong>
-              <span>Reading streak</span>
+              <span>
+                {errorTracker.streakDays === 0
+                  ? "Day 1 (Streak starts tomorrow)"
+                  : "Reading streak"}
+              </span>
             </div>
           </div>
 

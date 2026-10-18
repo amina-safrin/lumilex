@@ -690,7 +690,7 @@ export const LEARNING_LEVELS = [
 ];
 
 const defaultState = () => ({
-  stars: Number(localStorage.getItem(LEGACY_STARS_KEY)) || 0,
+  stars: 0,
   badges: [],
   completedStories: 0,
   completedSessions: 0,
@@ -703,22 +703,37 @@ export function getLearningState(userId = null) {
   try {
     const ssKey = storageKey(userId);
     const saved = localStorage.getItem(ssKey);
-    const state = saved ? { ...defaultState(), ...JSON.parse(saved) } : defaultState();
-    // Merge legacy stars if present for this user
-    const legacyKey = legacyStarsKey(userId);
-    const legacyStars = Number(localStorage.getItem(legacyKey)) || 0;
-    state.stars = Math.max(state.stars || 0, legacyStars);
-    return state;
+    if (!saved) return defaultState();
+    const parsed = JSON.parse(saved);
+    return { ...defaultState(), ...parsed, stars: Number(parsed.stars) || 0 };
   } catch {
     return defaultState();
   }
 }
 
+export function setLearningStateLocally(serverProgress, userId = null) {
+  if (!serverProgress) return getLearningState(userId);
+  const ssKey = storageKey(userId);
+  const current = getLearningState(userId);
+  const merged = {
+    ...current,
+    stars: Number(serverProgress.stars) || 0,
+    currentLevel: Number(serverProgress.currentLevel || serverProgress.current_level) || 1,
+    gardenPoints: Number(serverProgress.gardenPoints || serverProgress.garden_points) || 0,
+    completedStories: Number(serverProgress.completedStories || serverProgress.completed_stories) || 0,
+    completedSessions: Number(serverProgress.completedSessions || serverProgress.completed_sessions) || 0,
+    badges: serverProgress.badges || current.badges || [],
+    levels: serverProgress.levels || current.levels || {},
+  };
+  try {
+    localStorage.setItem(ssKey, JSON.stringify(merged));
+  } catch (e) {}
+  return merged;
+}
+
 function saveState(state, userId = null) {
   const ssKey = storageKey(userId);
-  const legacyKey = legacyStarsKey(userId);
   localStorage.setItem(ssKey, JSON.stringify(state));
-  localStorage.setItem(legacyKey, String(state.stars));
 
   // Sync to PostgreSQL in background
   if (typeof window !== "undefined") {

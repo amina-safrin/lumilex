@@ -7,13 +7,18 @@ const router = express.Router();
 // =========================================================
 // GET /api/learning/state
 // Returns individual learning progress, streak, gems, theme & tricky items
+// =========================================================
+// GET /api/learning/state
+// Returns individual learning progress, streak, gems, theme & tricky items
 // for the authenticated child (via req.user.id)
 // =========================================================
 router.get("/state", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
+    const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
 
-    // 1. Fetch or initialize learning progress
+    // 1. Fetch or initialize learning progress (stars initially zero)
     let progressRes = await pool.query(
       `SELECT stars, current_level, garden_points, completed_stories, completed_sessions, badges, levels
        FROM learning_progress WHERE user_id = $1`,
@@ -30,22 +35,43 @@ router.get("/state", authenticateToken, async (req, res) => {
       progressRes = init;
     }
 
-    // 2. Fetch or initialize preferences & error tracker stats
+    // 2. Fetch or initialize preferences (gems initially zero + welcome bonus for creating account)
     let prefRes = await pool.query(
-      `SELECT theme, streak_days, last_practice_date, perfect_lessons, gems, recent_accuracies
+      `SELECT theme, streak_days, last_practice_date, last_daily_bonus_date, perfect_lessons, gems, recent_accuracies
        FROM child_preferences WHERE user_id = $1`,
       [userId]
     );
 
+    let dailyBonusAwarded = false;
+    let dailyBonusGems = 0;
+
     if (prefRes.rows.length === 0) {
-      const today = new Date().toISOString().split("T")[0];
+      // Welcome bonus of 20 gems for creating an account in LumiLex!
       const initPref = await pool.query(
-        `INSERT INTO child_preferences (user_id, theme, streak_days, last_practice_date, perfect_lessons, gems, recent_accuracies)
-         VALUES ($1, 'forest', 1, $2, 0, 10, '[]'::jsonb)
-         RETURNING theme, streak_days, last_practice_date, perfect_lessons, gems, recent_accuracies`,
+        `INSERT INTO child_preferences (user_id, theme, streak_days, last_practice_date, last_daily_bonus_date, perfect_lessons, gems, recent_accuracies)
+         VALUES ($1, 'forest', 0, NULL, $2, 0, 20, '[]'::jsonb)
+         RETURNING theme, streak_days, last_practice_date, last_daily_bonus_date, perfect_lessons, gems, recent_accuracies`,
         [userId, today]
       );
       prefRes = initPref;
+    } else {
+      // Check if child is coming to learn on a new day (Daily learning gems bonus!)
+      const prefRow = prefRes.rows[0];
+      if (prefRow.last_daily_bonus_date !== today) {
+        dailyBonusAwarded = true;
+        dailyBonusGems = 5;
+        const updatedGems = (prefRow.gems ?? 0) + dailyBonusGems;
+        
+        await pool.query(
+          `UPDATE child_preferences
+           SET gems = $1, last_daily_bonus_date = $2, updated_at = CURRENT_TIMESTAMP
+           WHERE user_id = $3`,
+          [updatedGems, today, userId]
+        );
+
+        prefRow.gems = updatedGems;
+        prefRow.last_daily_bonus_date = today;
+      }
     }
 
     // 3. Fetch active mistakes for personalized practice sessions
@@ -73,25 +99,39 @@ router.get("/state", authenticateToken, async (req, res) => {
     const progress = progressRes.rows[0];
     const pref = prefRes.rows[0];
 
+    // Evaluate active streak:
+    // If last_practice_date is older than yesterday, the active streak has lapsed
+    let activeStreak = pref.streak_days ?? 0;
+    if (pref.last_practice_date && pref.last_practice_date !== today && pref.last_practice_date !== yesterday) {
+      activeStreak = 0;
+    }
+
     return res.json({
       userId,
       progress: {
-        stars: progress.stars,
-        currentLevel: progress.current_level,
-        gardenPoints: progress.garden_points,
-        completedStories: progress.completed_stories,
-        completedSessions: progress.completed_sessions,
+        stars: progress.stars ?? 0,
+        currentLevel: progress.current_level || 1,
+        gardenPoints: progress.garden_points ?? 0,
+        completedStories: progress.completed_stories ?? 0,
+        completedSessions: progress.completed_sessions ?? 0,
         badges: progress.badges || [],
         levels: progress.levels || {},
       },
       preferences: {
         theme: pref.theme || "forest",
-        streakDays: pref.streak_days || 1,
+        streakDays: activeStreak,
         lastPracticeDate: pref.last_practice_date,
-        perfectLessonsCount: pref.perfect_lessons || 0,
-        gems: pref.gems || 10,
+        perfectLessonsCount: pref.perfect_lessons ?? 0,
+        gems: pref.gems ?? 0,
         recentAccuracies: pref.recent_accuracies || [],
       },
+      dailyBonus: dailyBonusAwarded
+        ? {
+            awarded: true,
+            gems: dailyBonusGems,
+            message: "🌟 Daily Learning Bonus: +5 Gems for learning today!",
+          }
+        : null,
       mistakes: mistakesMap,
     });
   } catch (error) {
@@ -227,30 +267,33 @@ router.post("/complete-lesson", authenticateToken, async (req, res) => {
     const { accuracy, mistakesCount } = req.body;
 
     const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+
     const prefRes = await pool.query(
       `SELECT streak_days, last_practice_date, perfect_lessons, gems, recent_accuracies
        FROM child_preferences WHERE user_id = $1`,
       [userId]
     );
 
-    let streakDays = 1;
+    let streakDays = 0;
     let perfectLessons = 0;
-    let gems = 10;
+    let gems = 0;
     let recentAccuracies = [];
 
     if (prefRes.rows.length > 0) {
       const row = prefRes.rows[0];
-      streakDays = row.streak_days || 1;
-      perfectLessons = row.perfect_lessons || 0;
-      gems = row.gems || 10;
+      streakDays = row.streak_days ?? 0;
+      perfectLessons = row.perfect_lessons ?? 0;
+      gems = row.gems ?? 0;
       recentAccuracies = row.recent_accuracies || [];
 
       if (row.last_practice_date !== today) {
-        const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
         if (row.last_practice_date === yesterday) {
+          // Returning on the consecutive second day (or subsequent consecutive days)
           streakDays += 1;
         } else {
-          streakDays = 1;
+          // First day ever or after a break: streak is 0 on the first day
+          streakDays = 0;
         }
       }
     }
@@ -261,7 +304,7 @@ router.post("/complete-lesson", authenticateToken, async (req, res) => {
     const isPerfect = Number(accuracy) === 100 && Number(mistakesCount) === 0;
     if (isPerfect) {
       perfectLessons += 1;
-      gems += 5;
+      gems += 5; // Bonus gems for perfection!
     } else {
       gems += 1;
     }

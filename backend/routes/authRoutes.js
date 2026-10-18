@@ -89,6 +89,23 @@ router.post("/signup", async (req, res) => {
 
     const user = result.rows[0];
 
+    // Initialize individual learning progress (stars initially zero)
+    await pool.query(
+      `INSERT INTO learning_progress (user_id, stars, current_level, garden_points, completed_stories, completed_sessions)
+       VALUES ($1, 0, 1, 0, 0, 0)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [user.id]
+    );
+
+    // Initialize child preferences (give welcome gems bonus for creating account in LumiLex, streak is 0 on day 1)
+    const today = new Date().toISOString().split("T")[0];
+    await pool.query(
+      `INSERT INTO child_preferences (user_id, theme, streak_days, last_practice_date, last_daily_bonus_date, gems, perfect_lessons)
+       VALUES ($1, 'forest', 0, NULL, $2, 20, 0)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [user.id, today]
+    );
+
     // Create login token
     const token = createToken(user);
 
@@ -345,7 +362,25 @@ passport.use(
           ]
         );
 
-        return done(null, newUser.rows[0]);
+        const createdUser = newUser.rows[0];
+
+        // Initialize progress & preferences (stars = 0, streak = 0, welcome gems = 20)
+        await pool.query(
+          `INSERT INTO learning_progress (user_id, stars, current_level, garden_points, completed_stories, completed_sessions)
+           VALUES ($1, 0, 1, 0, 0, 0)
+           ON CONFLICT (user_id) DO NOTHING`,
+          [createdUser.id]
+        );
+
+        const today = new Date().toISOString().split("T")[0];
+        await pool.query(
+          `INSERT INTO child_preferences (user_id, theme, streak_days, last_practice_date, last_daily_bonus_date, gems, perfect_lessons)
+           VALUES ($1, 'forest', 0, NULL, $2, 20, 0)
+           ON CONFLICT (user_id) DO NOTHING`,
+          [createdUser.id, today]
+        );
+
+        return done(null, createdUser);
       } catch (error) {
         console.error(
           "Google authentication error:",
