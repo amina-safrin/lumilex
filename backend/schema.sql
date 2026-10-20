@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS child_preferences (
     last_daily_bonus_date VARCHAR(20),
     perfect_lessons INTEGER DEFAULT 0,
     gems INTEGER DEFAULT 0,
+    welcome_reward_claimed BOOLEAN DEFAULT FALSE,
     recent_accuracies JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

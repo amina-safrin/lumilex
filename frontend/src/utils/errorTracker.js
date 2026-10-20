@@ -20,6 +20,7 @@ const defaultErrorState = () => ({
   lastDailyBonusDate: null,
   perfectLessonsCount: 0,
   gems: 0,
+  welcomeRewardClaimed: false,
   recentAccuracies: [],
 });
 
@@ -54,6 +55,7 @@ export function setErrorTrackerLocally(serverPref, userId = null) {
     lastDailyBonusDate: serverPref.lastDailyBonusDate ?? serverPref.last_daily_bonus_date ?? current.lastDailyBonusDate,
     perfectLessonsCount: typeof serverPref.perfectLessonsCount === "number" ? serverPref.perfectLessonsCount : (typeof serverPref.perfect_lessons === "number" ? serverPref.perfect_lessons : current.perfectLessonsCount),
     gems: typeof serverPref.gems === "number" ? serverPref.gems : current.gems,
+    welcomeRewardClaimed: typeof serverPref.welcomeRewardClaimed === "boolean" ? serverPref.welcomeRewardClaimed : (typeof serverPref.welcome_reward_claimed === "boolean" ? serverPref.welcome_reward_claimed : current.welcomeRewardClaimed),
     recentAccuracies: serverPref.recentAccuracies || serverPref.recent_accuracies || current.recentAccuracies,
   };
   saveErrorTrackerState(merged, userId);

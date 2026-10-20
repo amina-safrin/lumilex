@@ -103,6 +103,11 @@
   box-shadow: 0 0 35px rgba(56, 189, 248, 0.45);
 }
 
+.reward-modal-gem-ring.welcome-gem-ring {
+  background: radial-gradient(circle, #fdf4ff 0%, #f3e8ff 60%, rgba(243, 232, 255, 0) 100%);
+  box-shadow: 0 0 35px rgba(168, 85, 247, 0.45);
+}
+
 .reward-modal-gem {
   font-size: 58px;
   line-height: 1;
@@ -141,6 +146,11 @@
   padding: 4px 12px;
   border-radius: 20px;
   margin-bottom: 10px;
+}
+
+.reward-modal-eyebrow.welcome-eyebrow {
+  color: #7c3aed;
+  background: #f3e8ff;
 }
 
 .daily-reward-modal-card h2 {
@@ -222,6 +232,19 @@
 .reward-claim-main-btn.claimed {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   box-shadow: 0 4px 0 #047857;
+}
+
+.reward-claim-main-btn.welcome-btn:not(.claimed) {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  box-shadow: 0 5px 0 #4f46e5, 0 10px 20px rgba(99, 102, 241, 0.35);
+}
+
+.reward-claim-main-btn.welcome-btn:not(.claimed):hover:not(:disabled) {
+  box-shadow: 0 7px 0 #4f46e5, 0 14px 25px rgba(99, 102, 241, 0.45);
+}
+
+.reward-claim-main-btn.welcome-btn:not(.claimed):active:not(:disabled) {
+  box-shadow: 0 2px 0 #4f46e5, 0 5px 10px rgba(99, 102, 241, 0.25);
 }
 
 .reward-claim-main-btn:disabled {

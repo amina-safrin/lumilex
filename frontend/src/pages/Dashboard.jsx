@@ -80,7 +80,7 @@ function Dashboard() {
   const [errorTracker, setErrorTracker] = useState(() => getErrorTrackerState(userId));
   const [stories, setStories] = useState([]);
   const [loadingStories, setLoadingStories] = useState(true);
-  const [dailyRewardModal, setDailyRewardModal] = useState(null);
+  const [rewardModal, setRewardModal] = useState(null);
   const [isClaimingReward, setIsClaimingReward] = useState(false);
   const [rewardClaimed, setRewardClaimed] = useState(false);
 
@@ -155,8 +155,13 @@ function Dashboard() {
             setErrorTracker(stateData.preferences);
             setErrorTrackerLocally(stateData.preferences, currentUid);
           }
-          if (stateData.dailyReward?.available) {
-            setDailyRewardModal(stateData.dailyReward);
+          // Priority 1: Welcome reward for newly created accounts (gems start at 0)
+          // Priority 2: Daily learning reward for coming to learn daily, just like streak
+          if (stateData.welcomeReward?.available) {
+            setRewardModal(stateData.welcomeReward);
+            playCelebrationFanfare();
+          } else if (stateData.dailyReward?.available) {
+            setRewardModal(stateData.dailyReward);
             playCelebrationFanfare();
           }
         }
@@ -182,41 +187,53 @@ function Dashboard() {
     loadData();
   }, [userId]);
 
-  const handleClaimDailyReward = async () => {
+  const handleClaimReward = async () => {
+    if (!rewardModal) return;
     try {
       setIsClaimingReward(true);
       playGemEarnedSound();
-      const res = await fetch("http://localhost:5000/api/learning/claim-daily-reward", {
+      const endpoint =
+        rewardModal.type === "welcome"
+          ? "http://localhost:5000/api/learning/claim-welcome-reward"
+          : "http://localhost:5000/api/learning/claim-daily-reward";
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
       });
+
       if (res.ok) {
         const data = await res.json();
         setRewardClaimed(true);
         if (data.totalGems !== undefined) {
-          setErrorTracker((prev) => ({ ...prev, gems: data.totalGems }));
+          setErrorTracker((prev) => ({
+            ...prev,
+            gems: data.totalGems,
+            welcomeRewardClaimed: true,
+          }));
           setErrorTrackerLocally(
             {
               gems: data.totalGems,
+              welcomeRewardClaimed: true,
               lastDailyBonusDate: new Date().toISOString().split("T")[0],
             },
             userId
           );
         }
         setTimeout(() => {
-          setDailyRewardModal(null);
+          setRewardModal(null);
           setRewardClaimed(false);
           setIsClaimingReward(false);
         }, 1200);
       } else {
         setIsClaimingReward(false);
-        setDailyRewardModal(null);
+        setRewardModal(null);
       }
     } catch (e) {
-      console.warn("Failed to claim daily reward:", e);
+      console.warn("Failed to claim reward:", e);
       setIsClaimingReward(false);
-      setDailyRewardModal(null);
+      setRewardModal(null);
     }
   };
 
@@ -495,10 +512,10 @@ function Dashboard() {
 
         </header>
 
-        {/* DAILY REWARD CLAIM POPUP MODAL */}
-        {dailyRewardModal && (
+        {/* REWARD CLAIM POPUP MODAL (WELCOME GIFT & DAILY LEARNING REWARD) */}
+        {rewardModal && (
           <div className="daily-reward-overlay" role="dialog" aria-modal="true">
-            <div className="daily-reward-modal-card">
+            <div className={`daily-reward-modal-card ${rewardModal.type === "welcome" ? "welcome-modal-card" : ""}`}>
               {/* Playful Floating Sparkles */}
               <div className="modal-sparkle sparkle-tl">✨</div>
               <div className="modal-sparkle sparkle-tr">✦</div>
@@ -510,48 +527,76 @@ function Dashboard() {
                 className="modal-close-btn"
                 onClick={() => {
                   playTapSound();
-                  setDailyRewardModal(null);
+                  setRewardModal(null);
                 }}
                 title="Close"
               >
                 ✕
               </button>
 
-              {/* Glowing animated gem */}
-              <div className="reward-modal-gem-ring">
+              {/* Glowing animated gem / gift */}
+              <div className={`reward-modal-gem-ring ${rewardModal.type === "welcome" ? "welcome-gem-ring" : ""}`}>
                 <div className={`reward-modal-gem ${rewardClaimed ? "gem-claimed" : ""}`}>
-                  💎
+                  {rewardModal.type === "welcome" ? "🎁" : "💎"}
                 </div>
               </div>
 
-              <span className="reward-modal-eyebrow">
-                <Sparkles size={14} />
-                DAILY LEARNING GIFT
-              </span>
+              {rewardModal.type === "welcome" ? (
+                <>
+                  <span className="reward-modal-eyebrow welcome-eyebrow">
+                    <Sparkles size={14} />
+                    NEW ACCOUNT WELCOME GIFT 🎉
+                  </span>
 
-              <h2>Welcome Back, {childName}! 🌟</h2>
+                  <h2>Welcome to LumiLex, {childName}! 🌟</h2>
 
-              <p className="reward-modal-desc">
-                You showed up to learn today! Claim your sparkly star crystals to keep growing your reading powers.
-              </p>
+                  <p className="reward-modal-desc">
+                    {rewardModal.message || "We're so thrilled you're here! Claim your special 20 Star Gems welcome gift to start your reading adventure."}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <span className="reward-modal-eyebrow">
+                    {rewardModal.streak > 0 ? (
+                      <>
+                        <Flame size={14} color="#f59e0b" />
+                        {rewardModal.streak}-DAY LEARNING STREAK 🔥
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={14} />
+                        DAILY LEARNING GIFT 🌟
+                      </>
+                    )}
+                  </span>
+
+                  <h2>{rewardModal.title || `Welcome Back, ${childName}! 🌟`}</h2>
+
+                  <p className="reward-modal-desc">
+                    {rewardModal.message || "You showed up to learn today! Claim your sparkly daily star gems and keep your reading powers growing."}
+                  </p>
+                </>
+              )}
 
               <div className="reward-gem-amount-badge">
-                <span className="gem-plus">+{dailyRewardModal.gems || 5}</span>
+                <span className="gem-plus">+{rewardModal.gems || (rewardModal.type === "welcome" ? 20 : 5)}</span>
                 <span className="gem-text">Star Gems 💎</span>
               </div>
 
               <button
                 type="button"
-                className={`reward-claim-main-btn ${rewardClaimed ? "claimed" : ""}`}
-                onClick={handleClaimDailyReward}
+                className={`reward-claim-main-btn ${rewardModal.type === "welcome" ? "welcome-btn" : ""} ${rewardClaimed ? "claimed" : ""}`}
+                onClick={handleClaimReward}
                 disabled={isClaimingReward || rewardClaimed}
               >
                 <Sparkles size={18} />
                 <span>
                   {rewardClaimed
-                    ? "Claimed! +5 Gems Added 🎉"
+                    ? `Claimed! +${rewardModal.gems || (rewardModal.type === "welcome" ? 20 : 5)} Gems Added 🎉`
                     : isClaimingReward
                     ? "Collecting Crystals..."
+                    : rewardModal.type === "welcome"
+                    ? "Claim Welcome Gift 💎"
                     : "Claim Daily Reward 💎"}
                 </span>
               </button>
@@ -561,7 +606,7 @@ function Dashboard() {
                 className="reward-modal-later-link"
                 onClick={() => {
                   playTapSound();
-                  setDailyRewardModal(null);
+                  setRewardModal(null);
                 }}
               >
                 I'll claim later

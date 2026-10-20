@@ -97,13 +97,12 @@ router.post("/signup", async (req, res) => {
       [user.id]
     );
 
-    // Initialize child preferences (give welcome gems bonus for creating account in LumiLex, streak is 0 on day 1)
-    const today = new Date().toISOString().split("T")[0];
+    // Initialize child preferences (gems initially 0, welcome reward unclaimed, streak is 0 on day 1)
     await pool.query(
-      `INSERT INTO child_preferences (user_id, theme, streak_days, last_practice_date, last_daily_bonus_date, gems, perfect_lessons)
-       VALUES ($1, 'forest', 0, NULL, $2, 20, 0)
+      `INSERT INTO child_preferences (user_id, theme, streak_days, last_practice_date, last_daily_bonus_date, gems, perfect_lessons, welcome_reward_claimed)
+       VALUES ($1, 'forest', 0, NULL, NULL, 0, 0, FALSE)
        ON CONFLICT (user_id) DO NOTHING`,
-      [user.id, today]
+      [user.id]
     );
 
     // Create login token
@@ -364,7 +363,7 @@ passport.use(
 
         const createdUser = newUser.rows[0];
 
-        // Initialize progress & preferences (stars = 0, streak = 0, welcome gems = 20)
+        // Initialize progress & preferences (stars = 0, streak = 0, gems = 0, welcome reward unclaimed)
         await pool.query(
           `INSERT INTO learning_progress (user_id, stars, current_level, garden_points, completed_stories, completed_sessions)
            VALUES ($1, 0, 1, 0, 0, 0)
@@ -372,12 +371,11 @@ passport.use(
           [createdUser.id]
         );
 
-        const today = new Date().toISOString().split("T")[0];
         await pool.query(
-          `INSERT INTO child_preferences (user_id, theme, streak_days, last_practice_date, last_daily_bonus_date, gems, perfect_lessons)
-           VALUES ($1, 'forest', 0, NULL, $2, 20, 0)
+          `INSERT INTO child_preferences (user_id, theme, streak_days, last_practice_date, last_daily_bonus_date, gems, perfect_lessons, welcome_reward_claimed)
+           VALUES ($1, 'forest', 0, NULL, NULL, 0, 0, FALSE)
            ON CONFLICT (user_id) DO NOTHING`,
-          [createdUser.id, today]
+          [createdUser.id]
         );
 
         return done(null, createdUser);

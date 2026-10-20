@@ -35,32 +35,59 @@ router.get("/state", authenticateToken, async (req, res) => {
       progressRes = init;
     }
 
-    // 2. Fetch or initialize preferences (gems initially zero + welcome bonus for creating account)
+    // 2. Fetch or initialize preferences (gems initially zero, streak 0 on day 1)
     let prefRes = await pool.query(
-      `SELECT theme, streak_days, last_practice_date, last_daily_bonus_date, perfect_lessons, gems, recent_accuracies
+      `SELECT theme, streak_days, last_practice_date, last_daily_bonus_date, perfect_lessons, gems, recent_accuracies, welcome_reward_claimed
        FROM child_preferences WHERE user_id = $1`,
       [userId]
     );
 
-    let canClaimDailyReward = false;
-    let dailyRewardGems = 5;
-
     if (prefRes.rows.length === 0) {
-      // Welcome bonus of 20 gems for creating an account in LumiLex!
       const initPref = await pool.query(
-        `INSERT INTO child_preferences (user_id, theme, streak_days, last_practice_date, last_daily_bonus_date, perfect_lessons, gems, recent_accuracies)
-         VALUES ($1, 'forest', 0, NULL, NULL, 0, 20, '[]'::jsonb)
-         RETURNING theme, streak_days, last_practice_date, last_daily_bonus_date, perfect_lessons, gems, recent_accuracies`,
+        `INSERT INTO child_preferences (user_id, theme, streak_days, last_practice_date, last_daily_bonus_date, perfect_lessons, gems, recent_accuracies, welcome_reward_claimed)
+         VALUES ($1, 'forest', 0, NULL, NULL, 0, 0, '[]'::jsonb, FALSE)
+         RETURNING theme, streak_days, last_practice_date, last_daily_bonus_date, perfect_lessons, gems, recent_accuracies, welcome_reward_claimed`,
         [userId]
       );
       prefRes = initPref;
-      canClaimDailyReward = true;
-    } else {
-      // Check if child has an unclaimed daily learning bonus for today
-      const prefRow = prefRes.rows[0];
-      if (prefRow.last_daily_bonus_date !== today) {
-        canClaimDailyReward = true;
-      }
+    }
+
+    const pref = prefRes.rows[0];
+
+    // Evaluate active streak:
+    // If last_practice_date is older than yesterday, the active streak has lapsed
+    let activeStreak = pref.streak_days ?? 0;
+    if (pref.last_practice_date && pref.last_practice_date !== today && pref.last_practice_date !== yesterday) {
+      activeStreak = 0;
+    }
+
+    // Determine rewards:
+    // 1. Welcome Gift: For newly created accounts (gems initially 0 until claimed)
+    // 2. Daily Learning Reward: For coming to learn daily, just like the streak
+    let welcomeReward = null;
+    let dailyReward = null;
+
+    if (!pref.welcome_reward_claimed) {
+      welcomeReward = {
+        available: true,
+        type: "welcome",
+        gems: 20,
+        title: "Welcome to LumiLex! 🎉",
+        subtitle: "New Explorer Gift",
+        message: "We're so glad you joined! Here is your special Welcome Gift of 20 Star Gems to kickstart your reading journey.",
+      };
+    } else if (pref.last_daily_bonus_date !== today) {
+      dailyReward = {
+        available: true,
+        type: "daily",
+        gems: 5,
+        streak: activeStreak,
+        title: activeStreak > 0 ? "Daily Learning Streak! 🔥" : "Daily Learning Gift! 🌟",
+        subtitle: activeStreak > 0 ? `${activeStreak}-Day Learning Streak` : "Daily Login Gift",
+        message: activeStreak > 0
+          ? `You came to learn today! Keep your ${activeStreak}-day learning streak glowing and claim your daily gems.`
+          : `You showed up to learn today! Claim your daily star gems and start your learning streak.`,
+      };
     }
 
     // 3. Fetch active mistakes for personalized practice sessions
@@ -86,14 +113,6 @@ router.get("/state", authenticateToken, async (req, res) => {
     });
 
     const progress = progressRes.rows[0];
-    const pref = prefRes.rows[0];
-
-    // Evaluate active streak:
-    // If last_practice_date is older than yesterday, the active streak has lapsed
-    let activeStreak = pref.streak_days ?? 0;
-    if (pref.last_practice_date && pref.last_practice_date !== today && pref.last_practice_date !== yesterday) {
-      activeStreak = 0;
-    }
 
     return res.json({
       userId,
@@ -113,15 +132,10 @@ router.get("/state", authenticateToken, async (req, res) => {
         perfectLessonsCount: pref.perfect_lessons ?? 0,
         gems: pref.gems ?? 0,
         recentAccuracies: pref.recent_accuracies || [],
+        welcomeRewardClaimed: pref.welcome_reward_claimed ?? false,
       },
-      dailyReward: canClaimDailyReward
-        ? {
-            available: true,
-            gems: dailyRewardGems,
-            title: "Daily Learning Gift",
-            message: "You showed up to learn today! Claim your sparkly gems.",
-          }
-        : null,
+      welcomeReward,
+      dailyReward,
       mistakes: mistakesMap,
     });
   } catch (error) {
@@ -131,8 +145,62 @@ router.get("/state", authenticateToken, async (req, res) => {
 });
 
 // =========================================================
+// POST /api/learning/claim-welcome-reward
+// Claims the +20 gems welcome gift for newly created accounts
+// =========================================================
+router.post("/claim-welcome-reward", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const today = new Date().toISOString().split("T")[0];
+
+    const prefRes = await pool.query(
+      `SELECT gems, welcome_reward_claimed FROM child_preferences WHERE user_id = $1`,
+      [userId]
+    );
+
+    let currentGems = 0;
+    let alreadyClaimed = false;
+    if (prefRes.rows.length > 0) {
+      currentGems = prefRes.rows[0].gems ?? 0;
+      alreadyClaimed = !!prefRes.rows[0].welcome_reward_claimed;
+    }
+
+    if (alreadyClaimed) {
+      return res.json({
+        alreadyClaimed: true,
+        gems: currentGems,
+        message: "Welcome gift already claimed!",
+      });
+    }
+
+    const rewardGems = 20;
+    const newGems = currentGems + rewardGems;
+
+    await pool.query(
+      `INSERT INTO child_preferences (user_id, gems, welcome_reward_claimed, last_daily_bonus_date, updated_at)
+       VALUES ($1, $2, TRUE, $3, CURRENT_TIMESTAMP)
+       ON CONFLICT (user_id) DO UPDATE SET
+         gems = EXCLUDED.gems,
+         welcome_reward_claimed = TRUE,
+         last_daily_bonus_date = EXCLUDED.last_daily_bonus_date,
+         updated_at = CURRENT_TIMESTAMP`,
+      [userId, newGems, today]
+    );
+
+    return res.json({
+      success: true,
+      gemsClaimed: rewardGems,
+      totalGems: newGems,
+    });
+  } catch (error) {
+    console.error("Error claiming welcome reward:", error);
+    return res.status(500).json({ message: "Failed to claim welcome reward" });
+  }
+});
+
+// =========================================================
 // POST /api/learning/claim-daily-reward
-// Claims the +5 gems daily reward and marks today as claimed
+// Claims the +5 gems daily reward for coming to learn daily
 // =========================================================
 router.post("/claim-daily-reward", authenticateToken, async (req, res) => {
   try {
