@@ -29,6 +29,58 @@ import { recordChildMistake, recordChildSuccess } from "../utils/errorTracker";
 import { finishBirdbrainLesson } from "../utils/birdbrainEngine";
 import "./LessonPlayerModal.css";
 
+// =========================================================
+// DYSLEXIA-FRIENDLY PHONETIC & LEVENSHTEIN MATCHER
+// Supports common letter transpositions (b <-> d, p <-> q, m <-> w)
+// and slight young-child pronunciation variations
+// =========================================================
+
+function levenshteinDistance(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+function isDyslexiaMatch(spoken, expected) {
+  if (!spoken || !expected) return false;
+  const s = spoken.toLowerCase().replace(/[.,!?;:"'()[\]{}]/g, "").trim();
+  const e = expected.toLowerCase().replace(/[.,!?;:"'()[\]{}]/g, "").trim();
+  if (s === e) return true;
+
+  // 1. Common dyslexia letter transpositions (b <-> d, p <-> q, m <-> w)
+  const normSpoken = s.replace(/d/g, "b").replace(/q/g, "p").replace(/w/g, "m");
+  const normExpected = e.replace(/d/g, "b").replace(/q/g, "p").replace(/w/g, "m");
+  if (normSpoken === normExpected) return true;
+
+  // 2. Levenshtein edit distance for young speech or minor accents
+  const dist = levenshteinDistance(s, e);
+  if (e.length <= 3 && dist <= 1) return true;
+  if (e.length > 3 && dist <= 2) return true;
+
+  // 3. Substring match
+  if (e.length >= 4 && (s.startsWith(e) || e.startsWith(s) || s.includes(e) || e.includes(s))) {
+    return true;
+  }
+
+  return false;
+}
+
 export default function LessonPlayerModal({
   lessonSession,
   onClose,
@@ -48,11 +100,16 @@ export default function LessonPlayerModal({
   const [finishStats, setFinishStats] = useState(null);
   const [wordsReadCount, setWordsReadCount] = useState(0);
 
-  // Read Out Loud (Voice Recognition) state
+  // Whisper AI & Voice Recognition state
   const [isListening, setIsListening] = useState(false);
+  const [isWhisperProcessing, setIsWhisperProcessing] = useState(false);
   const [heardTranscript, setHeardTranscript] = useState("");
   const [speechError, setSpeechError] = useState("");
   const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
+  const isListeningRef = useRef(false);
 
   // Letter Building state (type: "letter_build")
   const [placedLetters, setPlacedLetters] = useState([]);
@@ -70,6 +127,7 @@ export default function LessonPlayerModal({
       setHeardTranscript("");
       setSpeechError("");
       setIsListening(false);
+      setIsWhisperProcessing(false);
 
       // Setup letter building bank if letter_build type
       if (currentQ.type === "letter_build" && currentQ.letterBank) {
@@ -101,76 +159,219 @@ export default function LessonPlayerModal({
   }, []);
 
   // -------------------------------------------------------
-  // Web Speech Recognition for "Read Out Loud" Exercises
+  // SEND AUDIO TO WHISPER MODEL (SAME AS STORY READING)
   // -------------------------------------------------------
-  const startSpeechRecognition = () => {
+  const sendAudioToWhisper = async (audioBlob) => {
+    if (!audioBlob || audioBlob.size === 0) return;
+
+    try {
+      setIsWhisperProcessing(true);
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "lesson_reading.webm");
+
+      // Prime Whisper decoder with target word or sentence for pinpoint child accuracy
+      const promptContext = currentQ.targetWord || currentQ.sentence || currentQ.answer || "";
+      if (promptContext) {
+        formData.append("prompt", promptContext);
+      }
+
+      const response = await fetch("http://localhost:5000/api/speech/transcribe", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      const data = await response.json();
+      setIsWhisperProcessing(false);
+
+      if (!response.ok) {
+        console.warn("Whisper speech route notice:", data.error || response.statusText);
+        return;
+      }
+
+      if (data.text && data.text.trim()) {
+        const transcript = data.text.trim();
+        setHeardTranscript(transcript);
+        evaluateSpokenReading(transcript, true);
+      }
+    } catch (err) {
+      console.warn("Whisper connection notice:", err.message);
+      setIsWhisperProcessing(false);
+    }
+  };
+
+  // -------------------------------------------------------
+  // EVALUATE SPOKEN READING (DYSLEXIA & YOUNG CHILD MATCHING)
+  // -------------------------------------------------------
+  const evaluateSpokenReading = (spokenText, isWhisper = false) => {
+    if (!spokenText || isAnswerChecked) return;
+
+    const cleanSpoken = spokenText.toLowerCase().replace(/[.,!?;:"'()[\]{}]/g, "").trim();
+
+    if (currentQ.type === "sentence_read") {
+      const sentenceTarget = (currentQ.sentence || "").toLowerCase().replace(/[.,!?;:"'()[\]{}]/g, "").trim();
+      const targetWords = sentenceTarget.split(/\s+/).filter(Boolean);
+      const spokenWords = cleanSpoken.split(/\s+/).filter(Boolean);
+
+      let matchedWords = 0;
+      targetWords.forEach((tw) => {
+        if (spokenWords.some((sw) => isDyslexiaMatch(sw, tw))) {
+          matchedWords++;
+        }
+      });
+
+      // Valid if child read at least 50% of the sentence words or significant spoken content
+      if (matchedWords >= Math.max(1, Math.ceil(targetWords.length * 0.5)) || cleanSpoken.length >= 4) {
+        handleSpeakSuccess(spokenText);
+      }
+    } else {
+      // Single word / phonics sound
+      const targetWord = (currentQ.targetWord || currentQ.answer || "").toLowerCase().replace(/[.,!?;:"'()[\]{}]/g, "").trim();
+      const spokenWords = cleanSpoken.split(/\s+/).filter(Boolean);
+
+      const hasMatch =
+        isDyslexiaMatch(cleanSpoken, targetWord) ||
+        spokenWords.some((sw) => isDyslexiaMatch(sw, targetWord)) ||
+        cleanSpoken.includes(targetWord) ||
+        targetWord.includes(cleanSpoken) ||
+        (cleanSpoken.length >= 1 && targetWord.length === 1 && cleanSpoken[0] === targetWord[0]);
+
+      if (hasMatch) {
+        handleSpeakSuccess(spokenText);
+      }
+    }
+  };
+
+  // -------------------------------------------------------
+  // START MICROPHONE RECORDING WITH WHISPER AI
+  // -------------------------------------------------------
+  const startSpeechRecognition = async () => {
     playPopSound();
     setSpeechError("");
     setHeardTranscript("");
+    setIsWhisperProcessing(false);
 
+    if (recordingTimerRef.current) {
+      clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+
+    // 1. Browser Speech Recognition (instant interim streaming preview)
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    if (!SpeechRecognition) {
-      setSpeechError("Microphone not supported in this browser. You can tap 'I Read It!' below.");
-      return;
+    if (SpeechRecognition) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = "en-US";
+
+        recognition.onresult = (event) => {
+          let transcript = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          if (transcript.trim()) {
+            setHeardTranscript(transcript.trim());
+            evaluateSpokenReading(transcript.trim(), false);
+          }
+        };
+
+        recognition.onerror = (err) => {
+          console.log("Browser speech notice:", err.error);
+        };
+
+        recognition.start();
+        recognitionRef.current = recognition;
+      } catch (e) {
+        console.log("Browser recognition fallback active.");
+      }
     }
 
+    // 2. MediaRecorder stream for accurate local Whisper AI model
     try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
 
-      recognition.onstart = () => {
-        setIsListening(true);
-      };
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+      isListeningRef.current = true;
+      setIsListening(true);
 
-      recognition.onresult = (event) => {
-        let transcript = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
-        }
-        const cleaned = transcript.trim().toLowerCase();
-        setHeardTranscript(transcript);
-
-        // Check if spoken text matches target word/letter
-        const target = (currentQ.targetWord || currentQ.answer || "").trim().toLowerCase();
-        if (target && (cleaned.includes(target) || target.includes(cleaned) || cleaned.length >= 1)) {
-          // If child said target word, auto-validate!
-          handleSpeakSuccess(transcript);
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
         }
       };
 
-      recognition.onerror = (err) => {
-        console.warn("Speech recognition notice:", err.error);
-        setIsListening(false);
-        if (err.error === "not-allowed") {
-          setSpeechError("Microphone permission was not allowed. Tap 'I Read It!' to continue.");
+      recorder.onstop = async () => {
+        if (audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, {
+            type: recorder.mimeType || "audio/webm",
+          });
+          audioChunksRef.current = [];
+          await sendAudioToWhisper(audioBlob);
         }
       };
 
-      recognition.onend = () => {
-        setIsListening(false);
+      recorder.onerror = () => {
+        setSpeechError("Microphone error occurred. Please try again or tap 'I Read It!'.");
+        stopSpeechRecognition();
       };
 
-      recognition.start();
-      recognitionRef.current = recognition;
-    } catch (e) {
-      console.warn("Speech recognition error:", e);
+      recorder.start();
+
+      // Automatically stop recording after 3.6s to submit audio chunk to Whisper
+      recordingTimerRef.current = setTimeout(() => {
+        if (recorder.state === "recording") {
+          recorder.stop();
+          setIsListening(false);
+          isListeningRef.current = false;
+        }
+      }, 3600);
+    } catch (err) {
+      console.warn("Microphone access error:", err);
       setIsListening(false);
-      setSpeechError("Microphone unavailable. Tap 'I Read It!' to continue.");
+      isListeningRef.current = false;
+      if (err.name === "NotAllowedError") {
+        setSpeechError("Microphone permission was not allowed. Tap 'I Read It!' to continue.");
+      } else {
+        setSpeechError("Could not access microphone. Tap 'I Read It!' to continue.");
+      }
     }
   };
 
   const stopSpeechRecognition = () => {
+    isListeningRef.current = false;
+    setIsListening(false);
+
+    if (recordingTimerRef.current) {
+      clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
       } catch (e) {}
       recognitionRef.current = null;
     }
-    setIsListening(false);
+
+    if (mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.state === "recording") {
+          mediaRecorderRef.current.stop();
+        }
+      } catch (e) {}
+      if (mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+      }
+      mediaRecorderRef.current = null;
+    }
   };
 
   const handleSpeakSuccess = (spokenText = "") => {
@@ -455,7 +656,9 @@ export default function LessonPlayerModal({
                   </button>
 
                   <span className="speak-instruction-text">
-                    {isListening
+                    {isWhisperProcessing
+                      ? "Listening with Whisper AI... 🧠"
+                      : isListening
                       ? "Listening... say it out loud! 🎙️"
                       : isCorrect
                       ? "Great reading! 🎉"
@@ -464,7 +667,7 @@ export default function LessonPlayerModal({
 
                   {heardTranscript && (
                     <div className="heard-transcript-pill">
-                      <span>I heard: "<strong>{heardTranscript}</strong>"</span>
+                      <span>✨ Whisper heard: "<strong>{heardTranscript}</strong>"</span>
                     </div>
                   )}
 
@@ -623,8 +826,24 @@ export default function LessonPlayerModal({
                     <Mic size={34} color="#ffffff" />
                   </button>
                   <span className="speak-instruction-text">
-                    {isListening ? "Listening... read the sentence! 🎙️" : "Tap mic and read the sentence out loud!"}
+                    {isWhisperProcessing
+                      ? "Listening with Whisper AI... 🧠"
+                      : isListening
+                      ? "Listening... read the sentence! 🎙️"
+                      : isCorrect
+                      ? "Great reading! 🎉"
+                      : "Tap mic and read the sentence out loud!"}
                   </span>
+
+                  {heardTranscript && (
+                    <div className="heard-transcript-pill">
+                      <span>✨ Whisper heard: "<strong>{heardTranscript}</strong>"</span>
+                    </div>
+                  )}
+
+                  {speechError && (
+                    <p className="speech-error-note">{speechError}</p>
+                  )}
 
                   {!isCorrect && (
                     <button
