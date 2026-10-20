@@ -668,6 +668,88 @@
   transform: translateY(-2px);
 }
 
+/* =================================================
+   DASHBOARD LESSONS SECTION (DUOLINGO STYLE)
+================================================= */
+
+.dashboard-lessons-section {
+  margin-top: 28px;
+  background: var(--theme-surface, #ffffff);
+  border: 2px solid var(--theme-border, #e5ede3);
+  border-radius: 28px;
+  padding: 30px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+}
+
+.dashboard-lessons-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.dashboard-lessons-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #047857;
+  background: #ecfdf5;
+  padding: 4px 12px;
+  border-radius: 14px;
+  margin-bottom: 8px;
+}
+
+.dashboard-lessons-header-row h2 {
+  font-family: "Nunito", sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--theme-text-main, #1e293b);
+  margin: 0 0 6px;
+}
+
+.dashboard-lessons-header-row p {
+  font-size: 14px;
+  color: var(--theme-text-muted, #64748b);
+  margin: 0;
+  max-width: 520px;
+  line-height: 1.45;
+}
+
+.dashboard-view-all-lessons-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 14px;
+  border: 2px solid var(--theme-border, #cbd5e1);
+  background: var(--theme-surface-subtle, #f8fafc);
+  color: var(--theme-text-main, #334155);
+  font-family: "Nunito", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.dashboard-view-all-lessons-btn:hover {
+  background: #e2e8f0;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .dashboard-lessons-section {
+    padding: 20px 16px;
+  }
+}
+
 @media (max-width: 768px) {
   .dashboard-recommendations-section {
     padding: 20px 16px;

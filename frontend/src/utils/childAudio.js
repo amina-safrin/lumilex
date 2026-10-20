@@ -198,6 +198,8 @@ export function playRetryGentleSound() {
   osc.stop(now + 0.26);
 }
 
+export const playGentleEncouragement = playRetryGentleSound;
+
 
 /**
  * Delightful blend chime when two words combine (honey + bee)

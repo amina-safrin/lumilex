@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import MyStories from "./pages/MyStories";
 import LearningJourney from "./pages/LearningJourney";
 import Practice from "./pages/Practice";
+import Lessons from "./pages/Lessons";
 import Settings from "./pages/Settings";
 
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -41,6 +42,7 @@ function App() {
         <Route path="/my-stories" element={<MyStories />} />
         <Route path="/learning-journey" element={<ProtectedRoute><LearningJourney /></ProtectedRoute>} />
         <Route path="/practice" element={<ProtectedRoute><Practice /></ProtectedRoute>} />
+        <Route path="/lessons" element={<ProtectedRoute><Lessons /></ProtectedRoute>} />
 
         <Route
           path="/child-profile"

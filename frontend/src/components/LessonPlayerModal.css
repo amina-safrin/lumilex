@@ -1,0 +1,607 @@
+/* =========================================================
+   DUOLINGO-STYLE LESSON PLAYER MODAL
+   Designed for Young Readers & Dyslexia Support
+========================================================= */
+
+.duo-lesson-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  z-index: 10000;
+  padding: 16px;
+  animation: fadeInLesson 0.25s ease-out;
+}
+
+@keyframes fadeInLesson {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.duo-lesson-modal-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 28px;
+  max-width: 620px;
+  width: 100%;
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+  animation: popLessonIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes popLessonIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* =========================================================
+   HEADER & PROGRESS BAR
+========================================================= */
+
+.duo-lesson-header {
+  padding: 20px 24px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.duo-lesson-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.duo-lesson-close-btn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+  transform: scale(1.08);
+}
+
+.duo-lesson-progress-track {
+  flex: 1;
+  height: 16px;
+  background: #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.duo-lesson-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+  border-radius: 12px;
+  transition: width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.duo-progress-shine {
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  right: 6px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 4px;
+}
+
+.duo-lesson-meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #ecfdf5;
+  border: 1.5px solid #a7f3d0;
+  border-radius: 16px;
+  font-family: "Nunito", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: #047857;
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   BIRDBRAIN ADAPTIVE PILL
+========================================================= */
+
+.birdbrain-adaptive-pill {
+  margin: 12px 24px 0;
+  padding: 6px 14px;
+  background: #f5f3ff;
+  border: 1.5px solid #ddd6fe;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #6d28d9;
+  width: fit-content;
+}
+
+/* =========================================================
+   QUESTION CONTENT
+========================================================= */
+
+.duo-question-container {
+  flex: 1;
+  padding: 24px 28px 20px;
+  overflow-y: auto;
+}
+
+.duo-prompt-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.duo-prompt-row h2 {
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+}
+
+.duo-speaker-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 2px solid #38bdf8;
+  background: #f0f9ff;
+  color: #0284c7;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 4px 0 #0284c7;
+  transition: all 0.15s ease;
+}
+
+.duo-speaker-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #0284c7;
+}
+
+.duo-speaker-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #0284c7;
+}
+
+/* Picture Mnemonic Card */
+.duo-mnemonic-card {
+  margin: 0 auto 24px;
+  padding: 16px 24px;
+  width: fit-content;
+  min-width: 170px;
+  text-align: center;
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.mnemonic-emoji {
+  font-size: 48px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.08));
+}
+
+.mnemonic-label {
+  font-family: "Nunito", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #475569;
+  letter-spacing: 0.04em;
+}
+
+/* Choices Grid */
+.duo-choices-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.duo-choice-card {
+  width: 100%;
+  padding: 16px 20px;
+  border-radius: 18px;
+  border: 2.5px solid #e2e8f0;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 4px 0 #cbd5e1;
+  transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+}
+
+.duo-choice-card:hover:not(:disabled) {
+  border-color: #94a3b8;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #94a3b8;
+}
+
+.duo-choice-card.selected {
+  border-color: #38bdf8;
+  background: #f0f9ff;
+  box-shadow: 0 4px 0 #0284c7;
+}
+
+.choice-number {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1.5px solid #cbd5e1;
+  background: #f8fafc;
+  display: grid;
+  place-items: center;
+  font-family: "Nunito", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.duo-choice-card.selected .choice-number {
+  border-color: #0284c7;
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.choice-text {
+  font-size: 17px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: 0.02em;
+}
+
+/* Checked Revealed States */
+.duo-choice-card.correct-revealed {
+  border-color: #22c55e;
+  background: #f0fdf4;
+  box-shadow: 0 4px 0 #16a34a;
+}
+
+.duo-choice-card.correct-revealed .choice-text {
+  color: #15803d;
+}
+
+.duo-choice-card.incorrect-revealed {
+  border-color: #f87171;
+  background: #fef2f2;
+  box-shadow: 0 4px 0 #dc2626;
+}
+
+.duo-choice-card.incorrect-revealed .choice-text {
+  color: #b91c1c;
+}
+
+/* =========================================================
+   BOTTOM DRAWER FEEDBACK BAR
+========================================================= */
+
+.duo-bottom-feedback-bar {
+  padding: 18px 24px;
+  border-top: 2px solid #e2e8f0;
+  transition: all 0.25s ease;
+}
+
+.duo-bottom-feedback-bar.state-pending {
+  background: #ffffff;
+}
+
+.duo-bottom-feedback-bar.state-correct {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.duo-bottom-feedback-bar.state-incorrect {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.feedback-pending-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.duo-check-btn {
+  width: 100%;
+  padding: 14px 28px;
+  border-radius: 16px;
+  border: none;
+  font-family: "Nunito", sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  background: #22c55e;
+  color: #ffffff;
+  box-shadow: 0 4px 0 #15803d;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.duo-check-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #15803d;
+}
+
+.duo-check-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #15803d;
+}
+
+.duo-check-btn:disabled {
+  background: #cbd5e1;
+  box-shadow: 0 4px 0 #94a3b8;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.feedback-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.feedback-msg {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.feedback-msg div {
+  display: flex;
+  flex-direction: column;
+}
+
+.feedback-msg strong {
+  font-family: "Nunito", sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.feedback-result-row.correct .feedback-msg strong {
+  color: #15803d;
+}
+
+.feedback-result-row.correct .feedback-msg span {
+  font-size: 13px;
+  color: #166534;
+  font-weight: 700;
+}
+
+.feedback-result-row.incorrect .feedback-msg strong {
+  color: #b91c1c;
+}
+
+.feedback-result-row.incorrect .feedback-msg span {
+  font-size: 13px;
+  color: #991b1b;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.duo-continue-btn {
+  padding: 13px 26px;
+  border-radius: 16px;
+  border: none;
+  font-family: "Nunito", sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #ffffff;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.duo-continue-btn.correct-btn {
+  background: #16a34a;
+  box-shadow: 0 4px 0 #14532d;
+}
+
+.duo-continue-btn.incorrect-btn {
+  background: #dc2626;
+  box-shadow: 0 4px 0 #991b1b;
+}
+
+.duo-continue-btn:hover {
+  transform: translateY(-2px);
+}
+
+.duo-continue-btn:active {
+  transform: translateY(2px);
+}
+
+/* =========================================================
+   COMPLETION VIEW (DUOLINGO CELEBRATION)
+========================================================= */
+
+.duo-lesson-finished-view {
+  padding: 36px 32px 30px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.finish-trophy-ring {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fef08a 0%, #fde047 60%, rgba(253, 224, 71, 0) 100%);
+  display: grid;
+  place-items: center;
+  margin-bottom: 16px;
+  box-shadow: 0 0 30px rgba(250, 204, 21, 0.45);
+  animation: trophyBounce 2s infinite ease-in-out;
+}
+
+.finish-trophy-emoji {
+  font-size: 52px;
+  line-height: 1;
+}
+
+@keyframes trophyBounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1) rotate(5deg); }
+}
+
+.duo-lesson-finished-view h2 {
+  font-family: "Nunito", sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0 0 6px;
+}
+
+.finish-subtitle {
+  font-size: 15px;
+  color: #64748b;
+  margin: 0 0 24px;
+}
+
+.finish-rewards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.finish-stat-card {
+  padding: 16px 10px;
+  border-radius: 18px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.finish-stat-card strong {
+  font-family: "Nunito", sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.finish-stat-card span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.finish-birdbrain-card {
+  width: 100%;
+  padding: 16px 20px;
+  background: #f5f3ff;
+  border: 2px dashed #c4b5fd;
+  border-radius: 18px;
+  text-align: left;
+  margin-bottom: 26px;
+}
+
+.finish-birdbrain-card .birdbrain-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "Nunito", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #7c3aed;
+  margin-bottom: 6px;
+}
+
+.finish-birdbrain-card p {
+  font-size: 13px;
+  color: #5b21b6;
+  margin: 0;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.duo-finish-continue-btn {
+  width: 100%;
+  padding: 16px 28px;
+  border-radius: 18px;
+  border: none;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  font-family: "Nunito", sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 5px 0 #047857, 0 10px 20px rgba(16, 185, 129, 0.3);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.duo-finish-continue-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 0 #047857, 0 14px 25px rgba(16, 185, 129, 0.4);
+}
+
+.duo-finish-continue-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 #047857;
+}
+
+/* =========================================================
+   RESPONSIVE DESIGN
+========================================================= */
+
+@media (max-width: 640px) {
+  .duo-lesson-modal-card {
+    min-height: auto;
+    border-radius: 22px;
+  }
+  .duo-question-container {
+    padding: 18px 20px;
+  }
+  .duo-prompt-row h2 {
+    font-size: 18px;
+  }
+  .finish-rewards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

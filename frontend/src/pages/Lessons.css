@@ -1,0 +1,163 @@
+/* =========================================================
+   LESSONS PAGE STYLING (DUOLINGO LEARNING HUB)
+========================================================= */
+
+.lessons-page-container {
+  min-height: 100vh;
+  background: var(--theme-bg, #f8fafc);
+  display: flex;
+  flex-direction: column;
+}
+
+/* =========================================================
+   TOPBAR & STATS
+========================================================= */
+
+.lessons-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--theme-surface, #ffffff);
+  border-bottom: 2px solid var(--theme-border, #e2e8f0);
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  backdrop-filter: blur(8px);
+}
+
+.lessons-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--theme-border, #e2e8f0);
+  background: var(--theme-surface-subtle, #f8fafc);
+  color: var(--theme-text-main, #334155);
+  font-family: "Nunito", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lessons-back-btn:hover {
+  background: #e2e8f0;
+  transform: translateX(-2px);
+}
+
+.lessons-stats-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lessons-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-family: "Nunito", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  background: var(--theme-surface-subtle, #f8fafc);
+  border: 1.5px solid var(--theme-border, #e2e8f0);
+  color: var(--theme-text-main, #1e293b);
+}
+
+.lessons-stat-pill.streak { color: #ea580c; border-color: #fed7aa; background: #fff7ed; }
+.lessons-stat-pill.gems { color: #0284c7; border-color: #bae6fd; background: #f0f9ff; }
+.lessons-stat-pill.stars { color: #d97706; border-color: #fde68a; background: #fffbeb; }
+.lessons-stat-pill.crowns { color: #b45309; border-color: #fef08a; background: #fefce8; }
+
+.lessons-sound-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--theme-border, #e2e8f0);
+  background: var(--theme-surface-subtle, #f8fafc);
+  color: var(--theme-text-muted, #64748b);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lessons-sound-btn:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+  transform: scale(1.08);
+}
+
+/* =========================================================
+   MAIN CONTENT & TABS
+========================================================= */
+
+.lessons-main-content {
+  flex: 1;
+  padding: 30px 24px 60px;
+  display: flex;
+  justify-content: center;
+}
+
+.lessons-content-column {
+  max-width: 760px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.lessons-unit-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+}
+
+.unit-tab-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 16px;
+  border: 2px solid var(--theme-border, #e2e8f0);
+  background: var(--theme-surface, #ffffff);
+  color: var(--theme-text-muted, #64748b);
+  font-family: "Nunito", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.unit-tab-pill:hover {
+  border-color: #94a3b8;
+  color: var(--theme-text-main, #1e293b);
+}
+
+.unit-tab-pill.active {
+  border-color: #10b981;
+  background: #ecfdf5;
+  color: #047857;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.15);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .lessons-topbar {
+    padding: 10px 16px;
+  }
+  .lessons-main-content {
+    padding: 16px 14px 40px;
+  }
+  .lessons-stat-pill span {
+    display: none;
+  }
+}
