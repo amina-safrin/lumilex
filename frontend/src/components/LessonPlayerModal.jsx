@@ -46,6 +46,7 @@ export default function LessonPlayerModal({
   const [correctCount, setCorrectCount] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [finishStats, setFinishStats] = useState(null);
+  const [wordsReadCount, setWordsReadCount] = useState(0);
 
   // Read Out Loud (Voice Recognition) state
   const [isListening, setIsListening] = useState(false);
@@ -177,6 +178,7 @@ export default function LessonPlayerModal({
     setIsCorrect(true);
     setIsAnswerChecked(true);
     setSelectedAnswer(spokenText || currentQ.targetWord || "Spoken");
+    setWordsReadCount((prev) => prev + 1);
     playSuccessChime();
     setCorrectCount((prev) => prev + 1);
     recordChildSuccess(currentQ, unit?.id || 1, userId);
@@ -334,6 +336,12 @@ export default function LessonPlayerModal({
             <Sparkles size={14} color="#10b981" />
             <span>Q{currentIndex + 1}/{questions.length}</span>
           </div>
+
+          <div className="duo-words-read-pill" title="Words read aloud in this lesson">
+            <span className="read-pill-icon">🗣️</span>
+            <span className="read-pill-count">{wordsReadCount}</span>
+            <span className="read-pill-label">read</span>
+          </div>
         </header>
 
         {/* ===================================================
@@ -379,6 +387,28 @@ export default function LessonPlayerModal({
                   <h1 className="target-word-text">{currentQ.targetWord || currentQ.answer}</h1>
                   {currentQ.phoneticHint && (
                     <span className="target-phonetic-badge">{currentQ.phoneticHint}</span>
+                  )}
+                  {currentQ.syllables && currentQ.syllables.length > 0 && (
+                    <div className="syllable-blend-container">
+                      <span className="syllable-blend-label">Tap sounds to blend:</span>
+                      <div className="syllable-chips-row">
+                        {currentQ.syllables.map((syl, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            className="syllable-chip-btn"
+                            onClick={() => {
+                              playPopSound();
+                              speakText(syl, { rate: 0.82, pitch: 1.38 });
+                            }}
+                            title={`Hear ${syl}`}
+                          >
+                            <Volume2 size={13} />
+                            <span>{syl}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -527,20 +557,35 @@ export default function LessonPlayerModal({
             {currentQ.type === "sentence_read" && (
               <div className="sentence-read-exercise">
                 <div className="sentence-card">
-                  {(currentQ.tokens || currentQ.sentence?.split(" ") || []).map((token, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      className="sentence-word-token"
-                      onClick={() => {
-                        playPopSound();
-                        speakText(token, { rate: 0.85, pitch: 1.38 });
-                      }}
-                      title="Tap to hear word in child's voice"
-                    >
-                      {token}
-                    </button>
-                  ))}
+                  <div className="sentence-tokens-row">
+                    {(currentQ.tokens || currentQ.sentence?.split(" ") || []).map((token, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        className="sentence-word-token"
+                        onClick={() => {
+                          playPopSound();
+                          speakText(token, { rate: 0.85, pitch: 1.38 });
+                        }}
+                        title="Tap to hear word in child's voice"
+                      >
+                        {token}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="sentence-listen-full-btn"
+                    onClick={() => {
+                      playPopSound();
+                      speakText(currentQ.sentence, { rate: 0.88, pitch: 1.38 });
+                    }}
+                    title="Hear entire sentence"
+                  >
+                    <Volume2 size={16} />
+                    <span>Hear full sentence</span>
+                  </button>
                 </div>
 
                 <div className="speak-mic-center">
@@ -652,6 +697,12 @@ export default function LessonPlayerModal({
                 <strong>+15 Points</strong>
                 <span>Tree Water</span>
               </div>
+
+              <div className="finish-stat-card words-read">
+                <span className="finish-stat-icon" style={{ fontSize: 24, lineHeight: 1 }}>🗣️</span>
+                <strong>{wordsReadCount}</strong>
+                <span>Words Read Aloud</span>
+              </div>
             </div>
 
             <div className="finish-birdbrain-card">
@@ -712,6 +763,28 @@ export default function LessonPlayerModal({
                     <span>You read and answered correctly! +1 Gem</span>
                   </div>
                 </div>
+
+                {/* Encouraging invitation to read the answer out loud */}
+                {currentQ.type !== "speak_loud" && currentQ.type !== "sentence_read" && (currentQ.targetWord || currentQ.answer || selectedAnswer) && (
+                  <div className="feedback-read-nudge">
+                    <span className="nudge-label">🗣️ Read aloud:</span>
+                    <button
+                      type="button"
+                      className="nudge-word-btn"
+                      onClick={() => {
+                        playPopSound();
+                        const wordToRead = String(currentQ.targetWord || currentQ.answer || selectedAnswer);
+                        speakText(wordToRead, { rate: 0.88, pitch: 1.38 });
+                        setWordsReadCount((prev) => prev + 1);
+                      }}
+                      title="Hear and read aloud"
+                    >
+                      <Volume2 size={15} />
+                      <strong>{String(currentQ.targetWord || currentQ.answer || selectedAnswer)}</strong>
+                    </button>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   className="duo-continue-btn correct-btn"

@@ -993,3 +993,189 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* =========================================================
+   READING ENHANCEMENT SUITE (READ MORE & BLEND SOUNDS)
+========================================================= */
+
+.duo-words-read-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: #fdf2f8;
+  border: 1.5px solid #fbcfe8;
+  border-radius: 16px;
+  font-family: "Nunito", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: #db2777;
+  flex-shrink: 0;
+  animation: popInPill 0.3s ease;
+}
+
+@keyframes popInPill {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.read-pill-icon {
+  font-size: 14px;
+}
+
+.read-pill-count {
+  font-size: 14px;
+  color: #be185d;
+  font-weight: 900;
+}
+
+.read-pill-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+
+/* Syllable Blending Chips */
+.syllable-blend-container {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.syllable-blend-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.syllable-chips-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.syllable-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 12px;
+  border: 2px solid #bae6fd;
+  background: #f0f9ff;
+  color: #0284c7;
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #7dd3fc;
+  transition: all 0.15s ease;
+}
+
+.syllable-chip-btn:hover {
+  transform: translateY(-2px);
+  background: #e0f2fe;
+  box-shadow: 0 5px 0 #38bdf8;
+  color: #0369a1;
+}
+
+.syllable-chip-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #7dd3fc;
+}
+
+/* Sentence Tokens Row & Listen Full Button */
+.sentence-tokens-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.sentence-listen-full-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border-radius: 14px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-family: "Nunito", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #cbd5e1;
+  transition: all 0.15s ease;
+}
+
+.sentence-listen-full-btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+  transform: translateY(-1px);
+}
+
+/* Read After Answer Nudge in Feedback Drawer */
+.feedback-read-nudge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1.5px dashed #86efac;
+  border-radius: 14px;
+}
+
+.nudge-label {
+  font-family: "Nunito", sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: #15803d;
+}
+
+.nudge-word-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 10px;
+  border: 1.5px solid #4ade80;
+  background: #f0fdf4;
+  color: #166534;
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #22c55e;
+  transition: all 0.15s ease;
+}
+
+.nudge-word-btn:hover {
+  transform: translateY(-1px);
+  background: #dcfce7;
+  box-shadow: 0 3px 0 #16a34a;
+}
+
+.nudge-word-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #22c55e;
+}
+
+.finish-stat-card.words-read {
+  border-color: #fbcfe8;
+  background: #fdf2f8;
+}
+
+.finish-stat-card.words-read strong {
+  color: #db2777;
+}
+
