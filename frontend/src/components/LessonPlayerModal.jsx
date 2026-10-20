@@ -229,6 +229,12 @@ export default function LessonPlayerModal({
       const target = (currentQ.targetWord || currentQ.answer).toUpperCase();
       correct = builtWord === target;
       setSelectedAnswer(builtWord);
+    } else if (currentQ.type === "speak_loud" || currentQ.type === "sentence_read") {
+      // For speech/reading cards, clicking check/read confirms completion & advances
+      correct = true;
+      const targetText = selectedAnswer || currentQ.targetWord || currentQ.sentence || "Read!";
+      setSelectedAnswer(targetText);
+      setWordsReadCount((prev) => prev + 1);
     } else {
       if (!selectedAnswer) return;
       const target = String(currentQ.answer || "").trim().toLowerCase();
@@ -256,8 +262,26 @@ export default function LessonPlayerModal({
     playPopSound();
     stopSpeechRecognition();
 
-    if (currentIndex + 1 < questions.length) {
-      setCurrentIndex((prev) => prev + 1);
+    const nextIdx = currentIndex + 1;
+    if (nextIdx < questions.length) {
+      // Synchronously reset all card states so next card is fresh & interactive
+      setSelectedAnswer(null);
+      setIsAnswerChecked(false);
+      setIsCorrect(false);
+      setHeardTranscript("");
+      setSpeechError("");
+      setIsListening(false);
+
+      const nextQ = questions[nextIdx];
+      if (nextQ?.type === "letter_build" && nextQ?.letterBank) {
+        setAvailableBank(nextQ.letterBank.map((letter, idx) => ({ id: `${letter}-${idx}`, letter })));
+        setPlacedLetters([]);
+      } else {
+        setAvailableBank([]);
+        setPlacedLetters([]);
+      }
+
+      setCurrentIndex(nextIdx);
     } else {
       // Completed all questions in the short bite-sized lesson!
       const totalQ = questions.length;
@@ -302,6 +326,8 @@ export default function LessonPlayerModal({
   const isCheckEnabled =
     currentQ.type === "letter_build"
       ? placedLetters.length > 0
+      : currentQ.type === "speak_loud" || currentQ.type === "sentence_read"
+      ? true
       : !!selectedAnswer;
 
   return (
@@ -358,7 +384,7 @@ export default function LessonPlayerModal({
             MAIN ACTIVE QUESTION VIEW
         =================================================== */}
         {!isFinished ? (
-          <div className="duo-question-container">
+          <div className="duo-question-container" key={currentIndex}>
             {/* Prompt with Child Voice Speaker */}
             <div className="duo-prompt-row">
               <h2>{currentQ.prompt}</h2>
@@ -749,9 +775,11 @@ export default function LessonPlayerModal({
                   type="button"
                   className="duo-check-btn"
                   onClick={handleCheckAnswer}
-                  disabled={!isCheckEnabled && currentQ.type !== "speak_loud"}
+                  disabled={!isCheckEnabled}
                 >
-                  CHECK ANSWER
+                  {currentQ.type === "speak_loud" || currentQ.type === "sentence_read"
+                    ? "I READ IT! 👍"
+                    : "CHECK ANSWER"}
                 </button>
               </div>
             ) : isCorrect ? (

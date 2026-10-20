@@ -142,13 +142,26 @@
 }
 
 /* =========================================================
-   QUESTION CONTENT
+   QUESTION CONTENT & SLIDING CARD ANIMATION
 ========================================================= */
+
+@keyframes slideCardForward {
+  0% {
+    opacity: 0;
+    transform: translateX(42px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
 
 .duo-question-container {
   flex: 1;
   padding: 24px 28px 20px;
   overflow-y: auto;
+  animation: slideCardForward 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform, opacity;
 }
 
 .duo-prompt-row {
@@ -605,6 +618,18 @@
   cursor: pointer;
   box-shadow: 0 4px 0 #0284c7;
   transition: all 0.15s ease;
+  animation: tilePopIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes tilePopIn {
+  from {
+    transform: scale(0.6) translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
 }
 
 .placed-letter-tile:hover:not(:disabled) {
