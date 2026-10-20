@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   X,
   Volume2,
@@ -10,8 +10,12 @@ import {
   Gem,
   Award,
   Sprout,
-  Flame,
-  Brain
+  Mic,
+  MicOff,
+  RotateCcw,
+  Check,
+  Brain,
+  ThumbsUp
 } from "lucide-react";
 import {
   speakText,
@@ -32,7 +36,7 @@ export default function LessonPlayerModal({
   userId = null,
   childName = "Reader",
 }) {
-  const { lesson, unit, questions = [], adaptiveMode, birdbrainMessage } = lessonSession;
+  const { lesson, unit, questions = [] } = lessonSession;
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
@@ -42,38 +46,193 @@ export default function LessonPlayerModal({
   const [correctCount, setCorrectCount] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [finishStats, setFinishStats] = useState(null);
-  const [isSaving, setIsSaving] = useState(false);
+
+  // Read Out Loud (Voice Recognition) state
+  const [isListening, setIsListening] = useState(false);
+  const [heardTranscript, setHeardTranscript] = useState("");
+  const [speechError, setSpeechError] = useState("");
+  const recognitionRef = useRef(null);
+
+  // Letter Building state (type: "letter_build")
+  const [placedLetters, setPlacedLetters] = useState([]);
+  const [availableBank, setAvailableBank] = useState([]);
 
   const currentQ = questions[currentIndex] || {};
   const progressPercent = Math.round(((currentIndex) / questions.length) * 100);
 
-  // Play prompt audio automatically or when question changes
+  // Initialize question state whenever currentIndex changes
   useEffect(() => {
     if (currentQ?.prompt) {
       setSelectedAnswer(null);
       setIsAnswerChecked(false);
       setIsCorrect(false);
+      setHeardTranscript("");
+      setSpeechError("");
+      setIsListening(false);
 
+      // Setup letter building bank if letter_build type
+      if (currentQ.type === "letter_build" && currentQ.letterBank) {
+        setAvailableBank(currentQ.letterBank.map((letter, idx) => ({ id: `${letter}-${idx}`, letter })));
+        setPlacedLetters([]);
+      }
+
+      // Automatically speak prompt in child's voice
       const speech = currentQ.audioPrompt || currentQ.prompt;
-      // Slight delay for smooth modal mount
       const timer = setTimeout(() => {
-        speakText(speech, 0.9, 1.05);
+        speakText(speech, { rate: 0.88, pitch: 1.38 });
       }, 350);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        stopSpeechRecognition();
+      };
     }
   }, [currentIndex]);
 
+  // Clean up recognition on unmount
+  useEffect(() => {
+    return () => {
+      stopSpeechRecognition();
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  // -------------------------------------------------------
+  // Web Speech Recognition for "Read Out Loud" Exercises
+  // -------------------------------------------------------
+  const startSpeechRecognition = () => {
+    playPopSound();
+    setSpeechError("");
+    setHeardTranscript("");
+
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setSpeechError("Microphone not supported in this browser. You can tap 'I Read It!' below.");
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event) => {
+        let transcript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        const cleaned = transcript.trim().toLowerCase();
+        setHeardTranscript(transcript);
+
+        // Check if spoken text matches target word/letter
+        const target = (currentQ.targetWord || currentQ.answer || "").trim().toLowerCase();
+        if (target && (cleaned.includes(target) || target.includes(cleaned) || cleaned.length >= 1)) {
+          // If child said target word, auto-validate!
+          handleSpeakSuccess(transcript);
+        }
+      };
+
+      recognition.onerror = (err) => {
+        console.warn("Speech recognition notice:", err.error);
+        setIsListening(false);
+        if (err.error === "not-allowed") {
+          setSpeechError("Microphone permission was not allowed. Tap 'I Read It!' to continue.");
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
+    } catch (e) {
+      console.warn("Speech recognition error:", e);
+      setIsListening(false);
+      setSpeechError("Microphone unavailable. Tap 'I Read It!' to continue.");
+    }
+  };
+
+  const stopSpeechRecognition = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+  };
+
+  const handleSpeakSuccess = (spokenText = "") => {
+    stopSpeechRecognition();
+    setIsCorrect(true);
+    setIsAnswerChecked(true);
+    setSelectedAnswer(spokenText || currentQ.targetWord || "Spoken");
+    playSuccessChime();
+    setCorrectCount((prev) => prev + 1);
+    recordChildSuccess(currentQ, unit?.id || 1, userId);
+  };
+
+  // -------------------------------------------------------
+  // Standard Choice & Image Card Selection
+  // -------------------------------------------------------
   const handleSelectChoice = (choice) => {
     if (isAnswerChecked) return;
     playPopSound();
     setSelectedAnswer(choice);
   };
 
-  const handleCheckAnswer = () => {
-    if (!selectedAnswer || isAnswerChecked) return;
+  const handlePlayVoiceAudio = (e, text) => {
+    e.stopPropagation();
+    playPopSound();
+    speakText(text, { rate: 0.88, pitch: 1.38 });
+  };
 
-    const correct = selectedAnswer.trim().toLowerCase() === currentQ.answer.trim().toLowerCase();
+  // -------------------------------------------------------
+  // Letter Building (type: "letter_build") Handlers
+  // -------------------------------------------------------
+  const handleBankTileClick = (tile) => {
+    if (isAnswerChecked) return;
+    playPopSound();
+    setAvailableBank((prev) => prev.filter((item) => item.id !== tile.id));
+    setPlacedLetters((prev) => [...prev, tile]);
+  };
+
+  const handlePlacedTileClick = (tile) => {
+    if (isAnswerChecked) return;
+    playPopSound();
+    setPlacedLetters((prev) => prev.filter((item) => item.id !== tile.id));
+    setAvailableBank((prev) => [...prev, tile]);
+  };
+
+  // -------------------------------------------------------
+  // Check Answer Handler
+  // -------------------------------------------------------
+  const handleCheckAnswer = () => {
+    if (isAnswerChecked) return;
+
+    let correct = false;
+
+    if (currentQ.type === "letter_build") {
+      const builtWord = placedLetters.map((p) => p.letter).join("").toUpperCase();
+      const target = (currentQ.targetWord || currentQ.answer).toUpperCase();
+      correct = builtWord === target;
+      setSelectedAnswer(builtWord);
+    } else {
+      if (!selectedAnswer) return;
+      const target = String(currentQ.answer || "").trim().toLowerCase();
+      correct = String(selectedAnswer).trim().toLowerCase() === target;
+    }
+
     setIsCorrect(correct);
     setIsAnswerChecked(true);
 
@@ -85,22 +244,27 @@ export default function LessonPlayerModal({
       playGentleEncouragement();
       setMistakesList((prev) => [...prev, currentQ]);
       recordChildMistake(currentQ, unit?.id || 1, userId);
-      // Read gentle hint aloud to help the child
+
+      // Gentle dyslexia hint in child's voice
       if (currentQ.hintSpeech || currentQ.hint) {
         setTimeout(() => {
-          speakText(currentQ.hintSpeech || currentQ.hint, 0.88, 1.0);
+          speakText(currentQ.hintSpeech || currentQ.hint, { rate: 0.86, pitch: 1.38 });
         }, 300);
       }
     }
   };
 
+  // -------------------------------------------------------
+  // Next Question / Completion Handler
+  // -------------------------------------------------------
   const handleNextQuestion = async () => {
     playPopSound();
+    stopSpeechRecognition();
+
     if (currentIndex + 1 < questions.length) {
       setCurrentIndex((prev) => prev + 1);
     } else {
-      // Completed all questions in the short lesson!
-      setIsSaving(true);
+      // Completed all questions in the short bite-sized lesson!
       const totalQ = questions.length;
       const finalAccuracy = Math.round((correctCount / totalQ) * 100);
       const finalMistakesCount = mistakesList.length;
@@ -127,8 +291,6 @@ export default function LessonPlayerModal({
       } catch (err) {
         console.warn("Error finishing lesson:", err);
         setIsFinished(true);
-      } finally {
-        setIsSaving(false);
       }
     }
   };
@@ -141,11 +303,17 @@ export default function LessonPlayerModal({
     onClose();
   };
 
+  // Check if check button can be enabled
+  const isCheckEnabled =
+    currentQ.type === "letter_build"
+      ? placedLetters.length > 0
+      : !!selectedAnswer;
+
   return (
     <div className="duo-lesson-overlay" role="dialog" aria-modal="true">
       <div className="duo-lesson-modal-card">
         {/* ===================================================
-            HEADER / PROGRESS BAR
+            TOP BAR & PROGRESS
         =================================================== */}
         <header className="duo-lesson-header">
           <button
@@ -160,7 +328,6 @@ export default function LessonPlayerModal({
             <X size={20} />
           </button>
 
-          {/* Duolingo-style Green Progress Bar */}
           <div className="duo-lesson-progress-track">
             <div
               className="duo-lesson-progress-fill"
@@ -177,21 +344,21 @@ export default function LessonPlayerModal({
         </header>
 
         {/* ===================================================
-            BIRDBRAIN ADAPTIVE BANNER
+            BIRDBRAIN ADAPTIVE PILL
         =================================================== */}
         {currentQ?.isBirdbrainReview && (
           <div className="birdbrain-adaptive-pill">
             <Brain size={14} color="#8b5cf6" />
-            <span>{currentQ.birdbrainBadge || "Birdbrain Review: Spaced Repetition"}</span>
+            <span>{currentQ.birdbrainBadge || "Birdbrain Spaced-Repetition"}</span>
           </div>
         )}
 
         {/* ===================================================
-            MAIN QUESTION VIEW
+            MAIN ACTIVE QUESTION VIEW
         =================================================== */}
         {!isFinished ? (
           <div className="duo-question-container">
-            {/* Prompt with Audio Speaker */}
+            {/* Prompt with Child Voice Speaker */}
             <div className="duo-prompt-row">
               <h2>{currentQ.prompt}</h2>
               <button
@@ -199,55 +366,260 @@ export default function LessonPlayerModal({
                 className="duo-speaker-btn"
                 onClick={() => {
                   playPopSound();
-                  speakText(currentQ.audioPrompt || currentQ.prompt, 0.88, 1.05);
+                  speakText(currentQ.audioPrompt || currentQ.prompt, { rate: 0.88, pitch: 1.38 });
                 }}
-                title="Hear question aloud"
+                title="Hear aloud in child's voice"
               >
                 <Volume2 size={22} />
               </button>
             </div>
 
-            {/* Picture Mnemonic Anchor */}
-            {currentQ.picture && (
-              <div className="duo-mnemonic-card">
-                <span className="mnemonic-emoji">{currentQ.picture}</span>
-                {currentQ.pictureLabel && (
-                  <span className="mnemonic-label">{currentQ.pictureLabel}</span>
-                )}
+            {/* ===============================================
+                QUESTION TYPE 1: READ OUT LOUD CHALLENGE 🎙️
+            =============================================== */}
+            {currentQ.type === "speak_loud" && (
+              <div className="speak-loud-exercise">
+                <div className="target-word-card">
+                  {currentQ.picture && (
+                    <span className="target-word-emoji">{currentQ.picture}</span>
+                  )}
+                  <h1 className="target-word-text">{currentQ.targetWord || currentQ.answer}</h1>
+                  {currentQ.phoneticHint && (
+                    <span className="target-phonetic-badge">{currentQ.phoneticHint}</span>
+                  )}
+                </div>
+
+                <div className="speak-mic-center">
+                  <button
+                    type="button"
+                    className={`speak-mic-hero-btn ${isListening ? "listening-pulse" : ""} ${isCorrect ? "heard-success" : ""}`}
+                    onClick={isListening ? stopSpeechRecognition : startSpeechRecognition}
+                    disabled={isAnswerChecked && isCorrect}
+                  >
+                    {isListening ? (
+                      <Mic size={36} color="#ffffff" className="mic-listening-icon" />
+                    ) : isCorrect ? (
+                      <Check size={36} color="#ffffff" />
+                    ) : (
+                      <Mic size={36} color="#ffffff" />
+                    )}
+                  </button>
+
+                  <span className="speak-instruction-text">
+                    {isListening
+                      ? "Listening... say it out loud! 🎙️"
+                      : isCorrect
+                      ? "Great reading! 🎉"
+                      : "Tap the microphone and read out loud!"}
+                  </span>
+
+                  {heardTranscript && (
+                    <div className="heard-transcript-pill">
+                      <span>I heard: "<strong>{heardTranscript}</strong>"</span>
+                    </div>
+                  )}
+
+                  {speechError && (
+                    <p className="speech-error-note">{speechError}</p>
+                  )}
+
+                  {/* Encouraging I-Read-It button so child is never stuck */}
+                  {!isCorrect && (
+                    <button
+                      type="button"
+                      className="speak-pass-btn"
+                      onClick={() => handleSpeakSuccess(currentQ.targetWord)}
+                    >
+                      <ThumbsUp size={16} />
+                      <span>I read it out loud! 👍</span>
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* Choice Buttons */}
-            <div className="duo-choices-grid">
-              {(currentQ.choices || []).map((choice, idx) => {
-                const isSelected = selectedAnswer === choice;
-                let choiceClass = "duo-choice-card";
-
-                if (isSelected) {
-                  choiceClass += " selected";
-                }
-                if (isAnswerChecked) {
-                  if (choice.trim().toLowerCase() === currentQ.answer.trim().toLowerCase()) {
-                    choiceClass += " correct-revealed";
-                  } else if (isSelected && !isCorrect) {
-                    choiceClass += " incorrect-revealed";
+            {/* ===============================================
+                QUESTION TYPE 2: SELECT THE MATCHING IMAGE 🖼️
+            =============================================== */}
+            {currentQ.type === "image_select" && currentQ.imageChoices && (
+              <div className="image-select-grid">
+                {currentQ.imageChoices.map((choice, idx) => {
+                  const isSelected = selectedAnswer === choice.label;
+                  let cardClass = "image-choice-card";
+                  if (isSelected) cardClass += " selected";
+                  if (isAnswerChecked) {
+                    if (choice.label.toLowerCase() === String(currentQ.answer).toLowerCase()) {
+                      cardClass += " correct-revealed";
+                    } else if (isSelected && !isCorrect) {
+                      cardClass += " incorrect-revealed";
+                    }
                   }
-                }
 
-                return (
+                  return (
+                    <div
+                      key={`${choice.label}-${idx}`}
+                      className={cardClass}
+                      onClick={() => handleSelectChoice(choice.label)}
+                    >
+                      <button
+                        type="button"
+                        className="image-card-speaker"
+                        onClick={(e) => handlePlayVoiceAudio(e, choice.audio || choice.label)}
+                        title={`Hear ${choice.label}`}
+                      >
+                        <Volume2 size={16} />
+                      </button>
+
+                      <span className="image-card-emoji">{choice.emoji}</span>
+                      <strong className="image-card-label">{choice.label}</strong>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ===============================================
+                QUESTION TYPE 3: TAP LETTERS TO BUILD WORD 🧱
+            =============================================== */}
+            {currentQ.type === "letter_build" && (
+              <div className="letter-build-exercise">
+                {/* Word Target Illustration */}
+                {currentQ.picture && (
+                  <div className="build-target-banner">
+                    <span className="build-emoji">{currentQ.picture}</span>
+                    <span className="build-label">{currentQ.pictureLabel || "Build the word"}</span>
+                  </div>
+                )}
+
+                {/* Placed Letter Slots */}
+                <div className="build-slots-row">
+                  {placedLetters.length === 0 ? (
+                    <div className="empty-slot-hint">Tap letter tiles below in order...</div>
+                  ) : (
+                    placedLetters.map((tile, idx) => (
+                      <button
+                        key={tile.id}
+                        type="button"
+                        className="placed-letter-tile"
+                        onClick={() => handlePlacedTileClick(tile)}
+                        title="Tap to remove"
+                        disabled={isAnswerChecked}
+                      >
+                        <span>{tile.letter}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                {/* Available Letter Bank */}
+                <div className="build-bank-row">
+                  {availableBank.map((tile) => (
+                    <button
+                      key={tile.id}
+                      type="button"
+                      className="bank-letter-tile"
+                      onClick={() => handleBankTileClick(tile)}
+                      disabled={isAnswerChecked}
+                    >
+                      <span>{tile.letter}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ===============================================
+                QUESTION TYPE 4: READ SENTENCE ALOUD 🗣️
+            =============================================== */}
+            {currentQ.type === "sentence_read" && (
+              <div className="sentence-read-exercise">
+                <div className="sentence-card">
+                  {(currentQ.tokens || currentQ.sentence?.split(" ") || []).map((token, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className="sentence-word-token"
+                      onClick={() => {
+                        playPopSound();
+                        speakText(token, { rate: 0.85, pitch: 1.38 });
+                      }}
+                      title="Tap to hear word in child's voice"
+                    >
+                      {token}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="speak-mic-center">
                   <button
-                    key={`${choice}-${idx}`}
                     type="button"
-                    className={choiceClass}
-                    onClick={() => handleSelectChoice(choice)}
-                    disabled={isAnswerChecked}
+                    className={`speak-mic-hero-btn ${isListening ? "listening-pulse" : ""} ${isCorrect ? "heard-success" : ""}`}
+                    onClick={isListening ? stopSpeechRecognition : startSpeechRecognition}
                   >
-                    <span className="choice-number">{idx + 1}</span>
-                    <span className="choice-text">{choice}</span>
+                    <Mic size={34} color="#ffffff" />
                   </button>
-                );
-              })}
-            </div>
+                  <span className="speak-instruction-text">
+                    {isListening ? "Listening... read the sentence! 🎙️" : "Tap mic and read the sentence out loud!"}
+                  </span>
+
+                  {!isCorrect && (
+                    <button
+                      type="button"
+                      className="speak-pass-btn"
+                      onClick={() => handleSpeakSuccess(currentQ.sentence)}
+                    >
+                      <ThumbsUp size={16} />
+                      <span>I read the sentence! 👍</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ===============================================
+                QUESTION TYPE 5: STANDARD CHOICES / WORD SELECT 📖
+            =============================================== */}
+            {(!["speak_loud", "image_select", "letter_build", "sentence_read"].includes(currentQ.type)) && (
+              <>
+                {currentQ.picture && (
+                  <div className="duo-mnemonic-card">
+                    <span className="mnemonic-emoji">{currentQ.picture}</span>
+                    {currentQ.pictureLabel && (
+                      <span className="mnemonic-label">{currentQ.pictureLabel}</span>
+                    )}
+                  </div>
+                )}
+
+                <div className="duo-choices-grid">
+                  {(currentQ.choices || []).map((choice, idx) => {
+                    const isSelected = selectedAnswer === choice;
+                    let choiceClass = "duo-choice-card";
+
+                    if (isSelected) choiceClass += " selected";
+                    if (isAnswerChecked) {
+                      if (choice.trim().toLowerCase() === String(currentQ.answer).trim().toLowerCase()) {
+                        choiceClass += " correct-revealed";
+                      } else if (isSelected && !isCorrect) {
+                        choiceClass += " incorrect-revealed";
+                      }
+                    }
+
+                    return (
+                      <button
+                        key={`${choice}-${idx}`}
+                        type="button"
+                        className={choiceClass}
+                        onClick={() => handleSelectChoice(choice)}
+                        disabled={isAnswerChecked}
+                      >
+                        <span className="choice-number">{idx + 1}</span>
+                        <span className="choice-text">{choice}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         ) : (
           /* ===================================================
@@ -260,10 +632,9 @@ export default function LessonPlayerModal({
 
             <h2>Lesson Complete, {childName}! 🎉</h2>
             <p className="finish-subtitle">
-              You finished <strong>{lesson.title}</strong> in {unit?.title || "Phonics"}!
+              You read and mastered <strong>{lesson.title}</strong> in {unit?.title || "Phonics"}!
             </p>
 
-            {/* Rewards Grid */}
             <div className="finish-rewards-grid">
               <div className="finish-stat-card stars">
                 <Star size={24} fill="#ffc800" color="#ffc800" />
@@ -290,18 +661,17 @@ export default function LessonPlayerModal({
               </div>
             </div>
 
-            {/* Birdbrain Diagnostics */}
             <div className="finish-birdbrain-card">
               <div className="birdbrain-header">
                 <Brain size={18} color="#8b5cf6" />
-                <strong>Birdbrain AI Report</strong>
+                <strong>Birdbrain AI Speech & Reading Summary</strong>
               </div>
               <p>
                 {finishStats?.isPerfect
-                  ? "Flawless score! Birdbrain upgraded your learning path with bonus Challenger diamonds!"
+                  ? "Flawless reading! You pronounced each letter sound with confidence and earned bonus Challenger diamonds!"
                   : finishStats?.accuracy >= 75
-                  ? "Great phonetic retention! Next stepping stone unlocked on your dashboard path."
-                  : "Good effort! Birdbrain will gently reinforce these letter friends in your upcoming practice."}
+                  ? "Awesome reading out loud! Birdbrain unlocked your next stepping stone on the path."
+                  : "Great effort reading aloud! Birdbrain will continue encouraging these friendly sounds in your next session."}
               </p>
             </div>
 
@@ -335,7 +705,7 @@ export default function LessonPlayerModal({
                   type="button"
                   className="duo-check-btn"
                   onClick={handleCheckAnswer}
-                  disabled={!selectedAnswer}
+                  disabled={!isCheckEnabled && currentQ.type !== "speak_loud"}
                 >
                   CHECK ANSWER
                 </button>
@@ -345,8 +715,8 @@ export default function LessonPlayerModal({
                 <div className="feedback-msg">
                   <CheckCircle2 size={32} color="#15803d" />
                   <div>
-                    <strong>Nicely Done! 🌟</strong>
-                    <span>You nailed this sound! +1 Gem</span>
+                    <strong>Awesome Job! 🌟</strong>
+                    <span>You read and answered correctly! +1 Gem</span>
                   </div>
                 </div>
                 <button
@@ -363,7 +733,7 @@ export default function LessonPlayerModal({
                   <AlertCircle size={32} color="#b91c1c" />
                   <div>
                     <strong>Friendly Hint:</strong>
-                    <span>{currentQ.hint || `Correct answer is ${currentQ.answer}`}</span>
+                    <span>{currentQ.hint || `Correct answer is ${currentQ.answer || currentQ.targetWord}`}</span>
                   </div>
                 </div>
                 <button

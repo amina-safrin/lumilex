@@ -379,7 +379,7 @@ export function playWhooshSound() {
 }
 
 // ---------------------------------------------------------
-// Speech Synthesis (Slow, Patient, Dyslexia-Optimized)
+// Speech Synthesis (Sweet, Clear Child's Voice for Dyslexia)
 // ---------------------------------------------------------
 
 export function getFriendlyVoice() {
@@ -387,22 +387,38 @@ export function getFriendlyVoice() {
   const voices = window.speechSynthesis.getVoices();
   if (!voices || voices.length === 0) return null;
 
-  const preferredVoices = [
+  // Search specifically for child or bright, youthful voices (Ana, Maisy, Junior, Samantha, etc.)
+  const preferredChildVoices = [
+    "Microsoft Ana",   // Windows/Edge natural child voice
+    "Ana",
+    "Maisy",
+    "Junior",
+    "Child",
+    "Kid",
+    "Samantha",        // Clear bright macOS / iOS voice
+    "Victoria",
     "Google US English",
-    "Samantha",
     "Jenny",
     "Aria",
-    "Ava",
     "Microsoft Zira",
-    "Karen",
   ];
 
-  for (const name of preferredVoices) {
+  for (const name of preferredChildVoices) {
     const found = voices.find(
       (v) => v.name.toLowerCase().includes(name.toLowerCase()) && v.lang.startsWith("en")
     );
     if (found) return found;
   }
+
+  // Filter out deep adult male voices (David, Mark, George, etc.) in favor of bright voices
+  const brightFemale = voices.find(
+    (v) =>
+      v.lang.startsWith("en") &&
+      !v.name.toLowerCase().includes("david") &&
+      !v.name.toLowerCase().includes("mark") &&
+      !v.name.toLowerCase().includes("george")
+  );
+  if (brightFemale) return brightFemale;
 
   return voices.find((v) => v.lang.startsWith("en")) || voices[0];
 }
@@ -456,11 +472,11 @@ export const PHONIC_SOUNDS = {
 export function speakPhonicSound(letter) {
   const char = String(letter).trim().toLowerCase().replace(/[^a-z]/g, "");
   const sound = PHONIC_SOUNDS[char] || char;
-  speakText(sound, { rate: 0.72, pitch: 1.1 });
+  speakText(sound, { rate: 0.82, pitch: 1.36 });
 }
 
 /**
- * Speak any word or phrase with patient, clear cadence
+ * Speak any word or phrase with a cheerful, patient child's voice
  */
 export function speakText(text, options = {}) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -471,8 +487,9 @@ export function speakText(text, options = {}) {
   if (!cleaned) return;
 
   const utterance = new SpeechSynthesisUtterance(cleaned);
-  utterance.rate = options.rate || 0.74; // Slower pace for dyslexia processing
-  utterance.pitch = options.pitch || 1.1; // Gentle, child-friendly pitch
+  // Child's voice tuning: Higher melodic pitch (1.38) and articulate pacing (0.88)
+  utterance.rate = typeof options.rate === "number" ? options.rate : 0.88;
+  utterance.pitch = typeof options.pitch === "number" ? options.pitch : 1.38;
   utterance.volume = getSoundVolume();
 
   const voice = getFriendlyVoice();
@@ -493,7 +510,7 @@ export function speakLetterMnemonic(letter, word, pictureEmoji = "") {
   const cleanLetter = String(letter).trim().toUpperCase();
   const cleanWord = cleanTextForSpeech(word);
   const text = `${cleanLetter}! ${cleanLetter} is for ${cleanWord}. ${cleanWord}!`;
-  speakText(text, { rate: 0.72, pitch: 1.12 });
+  speakText(text, { rate: 0.85, pitch: 1.38 });
 }
 
 /**
@@ -505,7 +522,7 @@ export function speakCompoundWord(firstWord, secondWord, combinedWord) {
   const w2 = cleanTextForSpeech(secondWord);
   const combo = cleanTextForSpeech(combinedWord);
   const text = `${w1}... plus ${w2}... makes ${combo}!`;
-  speakText(text, { rate: 0.72, pitch: 1.12 });
+  speakText(text, { rate: 0.85, pitch: 1.38 });
 }
 
 /**

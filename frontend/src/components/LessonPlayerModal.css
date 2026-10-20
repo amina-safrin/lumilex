@@ -309,6 +309,394 @@
 }
 
 /* =========================================================
+   READ OUT LOUD EXERCISE (MICROPHONE CHALLENGE)
+========================================================= */
+
+.speak-loud-exercise {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  padding: 10px 0;
+}
+
+.target-word-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 36px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%);
+  border: 3px solid #67e8f9;
+  border-radius: 26px;
+  box-shadow: 0 10px 25px rgba(6, 182, 212, 0.12);
+  min-width: 260px;
+}
+
+.target-word-emoji {
+  font-size: 58px;
+  line-height: 1;
+}
+
+.target-word-text {
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #0e7490;
+  margin: 0;
+}
+
+.target-phonetic-badge {
+  font-family: "Nunito", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0369a1;
+  background: #e0f2fe;
+  padding: 4px 14px;
+  border-radius: 12px;
+}
+
+.speak-mic-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.speak-mic-hero-btn {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #0369a1, 0 12px 24px rgba(14, 165, 233, 0.4);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+}
+
+.speak-mic-hero-btn:hover:not(:disabled) {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 9px 0 #0369a1, 0 16px 30px rgba(14, 165, 233, 0.5);
+}
+
+.speak-mic-hero-btn:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 3px 0 #0369a1;
+}
+
+.speak-mic-hero-btn.listening-pulse {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 6px 0 #b91c1c, 0 0 35px rgba(239, 68, 68, 0.6);
+  animation: micPulseWave 1.4s infinite ease-in-out;
+}
+
+@keyframes micPulseWave {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+.speak-mic-hero-btn.heard-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 6px 0 #047857;
+}
+
+.speak-instruction-text {
+  font-family: "Nunito", sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: #334155;
+  text-align: center;
+}
+
+.heard-transcript-pill {
+  padding: 6px 16px;
+  background: #f1f5f9;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 14px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.speech-error-note {
+  font-size: 12px;
+  color: #dc2626;
+  font-weight: 700;
+  margin: 0;
+  text-align: center;
+  max-width: 320px;
+}
+
+.speak-pass-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 14px;
+  border: 1.5px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  font-family: "Nunito", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 4px;
+}
+
+.speak-pass-btn:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+  transform: translateY(-1px);
+}
+
+/* =========================================================
+   IMAGE SELECT EXERCISE (RICH MULTI-IMAGE CARDS)
+========================================================= */
+
+.image-select-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.image-choice-card {
+  position: relative;
+  background: #ffffff;
+  border: 3px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 24px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  box-shadow: 0 5px 0 #cbd5e1;
+  transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.image-choice-card:hover {
+  border-color: #94a3b8;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 0 #94a3b8;
+}
+
+.image-choice-card.selected {
+  border-color: #38bdf8;
+  background: #f0f9ff;
+  box-shadow: 0 5px 0 #0284c7;
+}
+
+.image-choice-card.correct-revealed {
+  border-color: #22c55e;
+  background: #f0fdf4;
+  box-shadow: 0 5px 0 #16a34a;
+}
+
+.image-choice-card.incorrect-revealed {
+  border-color: #f87171;
+  background: #fef2f2;
+  box-shadow: 0 5px 0 #dc2626;
+}
+
+.image-card-speaker {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0284c7;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.image-card-speaker:hover {
+  background: #e0f2fe;
+  transform: scale(1.1);
+}
+
+.image-card-emoji {
+  font-size: 52px;
+  line-height: 1;
+}
+
+.image-card-label {
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+/* =========================================================
+   LETTER BUILD EXERCISE (SPELL WITH TILES)
+========================================================= */
+
+.letter-build-exercise {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.build-target-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  border-radius: 18px;
+}
+
+.build-emoji {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.build-label {
+  font-family: "Nunito", sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: #334155;
+}
+
+.build-slots-row {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  background: #f1f5f9;
+  border-radius: 20px;
+  border: 2px solid #e2e8f0;
+}
+
+.empty-slot-hint {
+  font-size: 14px;
+  color: #94a3b8;
+  font-weight: 700;
+  font-style: italic;
+}
+
+.placed-letter-tile {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  border: 2.5px solid #38bdf8;
+  background: #ffffff;
+  color: #0284c7;
+  display: grid;
+  place-items: center;
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #0284c7;
+  transition: all 0.15s ease;
+}
+
+.placed-letter-tile:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: #fee2e2;
+  border-color: #f87171;
+  color: #dc2626;
+  box-shadow: 0 4px 0 #dc2626;
+}
+
+.build-bank-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.bank-letter-tile {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  border: 2.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
+  display: grid;
+  place-items: center;
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #94a3b8;
+  transition: all 0.15s ease;
+}
+
+.bank-letter-tile:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: #38bdf8;
+  color: #0284c7;
+  box-shadow: 0 6px 0 #0284c7;
+}
+
+.bank-letter-tile:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #94a3b8;
+}
+
+/* =========================================================
+   SENTENCE READ EXERCISE
+========================================================= */
+
+.sentence-read-exercise {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+
+.sentence-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 24px 28px;
+  background: #f8fafc;
+  border: 2.5px solid #e2e8f0;
+  border-radius: 22px;
+}
+
+.sentence-word-token {
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #cbd5e1;
+  transition: all 0.15s ease;
+}
+
+.sentence-word-token:hover {
+  border-color: #38bdf8;
+  background: #f0f9ff;
+  color: #0284c7;
+  transform: translateY(-2px);
+}
+
+/* =========================================================
    BOTTOM DRAWER FEEDBACK BAR
 ========================================================= */
 
