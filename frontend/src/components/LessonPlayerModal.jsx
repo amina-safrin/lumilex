@@ -689,70 +689,68 @@ export default function LessonPlayerModal({
           /* ===================================================
               CELEBRATORY COMPLETION SCREEN (DUOLINGO STYLE)
           =================================================== */
-          <div className="duo-lesson-finished-view">
-            <div className="finish-trophy-ring">
-              <span className="finish-trophy-emoji">🏆</span>
-            </div>
-
-            <h2>Lesson Complete, {childName}! 🎉</h2>
-            <p className="finish-subtitle">
-              You read and mastered <strong>{lesson.title}</strong> in {unit?.title || "Phonics"}!
-            </p>
-
-            <div className="finish-rewards-grid">
-              <div className="finish-stat-card stars">
-                <Star size={24} fill="#ffc800" color="#ffc800" />
-                <strong>+{finishStats?.starsEarned || 3} Stars</strong>
-                <span>Effort Points</span>
+          <div className="duo-lesson-finished-wrapper">
+            <div className="duo-lesson-finished-view">
+              <div className="finish-trophy-ring">
+                <span className="finish-trophy-emoji">🏆</span>
               </div>
 
-              <div className="finish-stat-card gems">
-                <Gem size={24} fill="#1cb0f6" color="#1cb0f6" />
-                <strong>+{finishStats?.gemsAwarded || 5} Gems</strong>
-                <span>Star Crystals</span>
-              </div>
-
-              <div className="finish-stat-card accuracy">
-                <Award size={24} color="#10b981" />
-                <strong>{finishStats?.accuracy || 100}%</strong>
-                <span>Accuracy</span>
-              </div>
-
-              <div className="finish-stat-card tree">
-                <Sprout size={24} color="#16a34a" />
-                <strong>+15 Points</strong>
-                <span>Tree Water</span>
-              </div>
-
-              <div className="finish-stat-card words-read">
-                <span className="finish-stat-icon" style={{ fontSize: 24, lineHeight: 1 }}>🗣️</span>
-                <strong>{wordsReadCount}</strong>
-                <span>Words Read Aloud</span>
-              </div>
-            </div>
-
-            <div className="finish-birdbrain-card">
-              <div className="birdbrain-header">
-                <Brain size={18} color="#8b5cf6" />
-                <strong>Birdbrain AI Speech & Reading Summary</strong>
-              </div>
-              <p>
-                {finishStats?.isPerfect
-                  ? "Flawless reading! You pronounced each letter sound with confidence and earned bonus Challenger diamonds!"
-                  : finishStats?.accuracy >= 75
-                  ? "Awesome reading out loud! Birdbrain unlocked your next stepping stone on the path."
-                  : "Great effort reading aloud! Birdbrain will continue encouraging these friendly sounds in your next session."}
+              <h2>Lesson Complete, {childName}! 🎉</h2>
+              <p className="finish-subtitle">
+                You read and mastered <strong>{lesson.title}</strong> in {unit?.title || "Phonics"}!
               </p>
+
+              <div className="finish-rewards-grid">
+                <div className="finish-stat-card stars">
+                  <Star size={20} fill="#ffc800" color="#ffc800" />
+                  <strong>+{finishStats?.starsEarned || 3} Stars</strong>
+                  <span>Effort</span>
+                </div>
+
+                <div className="finish-stat-card gems">
+                  <Gem size={20} fill="#1cb0f6" color="#1cb0f6" />
+                  <strong>+{finishStats?.gemsAwarded || 5} Gems</strong>
+                  <span>Crystals</span>
+                </div>
+
+                <div className="finish-stat-card accuracy">
+                  <Award size={20} color="#10b981" />
+                  <strong>{finishStats?.accuracy || 100}%</strong>
+                  <span>Accuracy</span>
+                </div>
+
+                <div className="finish-stat-card words-read">
+                  <span className="finish-stat-icon" style={{ fontSize: 18, lineHeight: 1 }}>🗣️</span>
+                  <strong>{wordsReadCount}</strong>
+                  <span>Read Aloud</span>
+                </div>
+              </div>
+
+              <div className="finish-birdbrain-card">
+                <div className="birdbrain-header">
+                  <Brain size={16} color="#8b5cf6" />
+                  <strong>Birdbrain AI Speech & Reading Summary</strong>
+                </div>
+                <p>
+                  {finishStats?.isPerfect
+                    ? "Flawless reading! You pronounced each letter sound with confidence and earned bonus Challenger diamonds!"
+                    : finishStats?.accuracy >= 75
+                    ? "Awesome reading out loud! Birdbrain unlocked your next stepping stone on the path."
+                    : "Great effort reading aloud! Birdbrain will continue encouraging these friendly sounds in your next session."}
+                </p>
+              </div>
             </div>
 
-            <button
-              type="button"
-              className="duo-finish-continue-btn"
-              onClick={handleFinishAndReturn}
-            >
-              <span>Continue Learning Path 🚀</span>
-              <ArrowRight size={18} />
-            </button>
+            <div className="duo-finish-footer">
+              <button
+                type="button"
+                className="duo-finish-continue-btn"
+                onClick={handleFinishAndReturn}
+              >
+                <span>Continue Learning Path 🚀</span>
+                <ArrowRight size={18} />
+              </button>
+            </div>
           </div>
         )}
 
@@ -785,33 +783,18 @@ export default function LessonPlayerModal({
             ) : isCorrect ? (
               <div className="feedback-result-row correct">
                 <div className="feedback-msg">
-                  <CheckCircle2 size={32} color="#15803d" />
+                  <CheckCircle2 size={26} color="#15803d" />
                   <div>
                     <strong>Awesome Job! 🌟</strong>
-                    <span>You read and answered correctly! +1 Gem</span>
+                    {currentQ.type !== "speak_loud" && currentQ.type !== "sentence_read" && (currentQ.targetWord || currentQ.answer || selectedAnswer) ? (
+                      <span className="feedback-mini-read">
+                        You read: <strong>{String(currentQ.targetWord || currentQ.answer || selectedAnswer)}</strong>
+                      </span>
+                    ) : (
+                      <span>+1 Gem earned</span>
+                    )}
                   </div>
                 </div>
-
-                {/* Encouraging invitation to read the answer out loud */}
-                {currentQ.type !== "speak_loud" && currentQ.type !== "sentence_read" && (currentQ.targetWord || currentQ.answer || selectedAnswer) && (
-                  <div className="feedback-read-nudge">
-                    <span className="nudge-label">🗣️ Read aloud:</span>
-                    <button
-                      type="button"
-                      className="nudge-word-btn"
-                      onClick={() => {
-                        playPopSound();
-                        const wordToRead = String(currentQ.targetWord || currentQ.answer || selectedAnswer);
-                        speakText(wordToRead, { rate: 0.88, pitch: 1.38 });
-                        setWordsReadCount((prev) => prev + 1);
-                      }}
-                      title="Hear and read aloud"
-                    >
-                      <Volume2 size={15} />
-                      <strong>{String(currentQ.targetWord || currentQ.answer || selectedAnswer)}</strong>
-                    </button>
-                  </div>
-                )}
 
                 <button
                   type="button"
@@ -824,10 +807,10 @@ export default function LessonPlayerModal({
             ) : (
               <div className="feedback-result-row incorrect">
                 <div className="feedback-msg">
-                  <AlertCircle size={32} color="#b91c1c" />
+                  <AlertCircle size={26} color="#b91c1c" />
                   <div>
                     <strong>Friendly Hint:</strong>
-                    <span>{currentQ.hint || `Correct answer is ${currentQ.answer || currentQ.targetWord}`}</span>
+                    <span>{currentQ.hint || `Answer is ${currentQ.answer || currentQ.targetWord}`}</span>
                   </div>
                 </div>
                 <button
