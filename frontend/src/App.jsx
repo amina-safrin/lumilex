@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { initGlobalButtonSounds } from "./utils/childAudio";
 
 import StoryLibrary from "./pages/StoryLibrary";
 import StoryReader from "./pages/StoryReader";
@@ -17,6 +19,11 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { ChildProvider } from "./context/ChildContext";
 
 function App() {
+  useEffect(() => {
+    const cleanup = initGlobalButtonSounds();
+    return cleanup;
+  }, []);
+
   return (
     <ChildProvider>
       <BrowserRouter>

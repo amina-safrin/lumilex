@@ -64,9 +64,85 @@ export function isSoundsMuted() {
 // Synthesized Sound Effects (Gentle & Encouraging)
 // ---------------------------------------------------------
 
+let lastPopTime = 0;
+
 /**
- * Cheerful ascending chime for correct answer (Pentatonic: C5, E5, G5, C6)
+ * Delightful bubble pop sound on button press
+ * Short, crisp, bouncy, and friendly for children with dyslexia
  */
+export function playPopSound() {
+  if (isSoundsMuted()) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  // Debounce rapid duplicate calls (within 60ms) so button click + inline handler don't double-fire
+  if (now - lastPopTime < 0.06) return;
+  lastPopTime = now;
+
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const vol = getSoundVolume();
+
+    osc.type = "sine";
+    // Pitch rises quickly and drops like a cheerful bubble popping
+    osc.frequency.setValueAtTime(360, now);
+    osc.frequency.exponentialRampToValueAtTime(840, now + 0.032);
+    osc.frequency.exponentialRampToValueAtTime(460, now + 0.07);
+
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.18 * vol, now + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.08);
+  } catch (e) {
+    // AudioContext safety fallback
+  }
+}
+
+/**
+ * Alias for backward compatibility across existing components
+ */
+export const playTapSound = playPopSound;
+
+/**
+ * Attaches a global click listener to play the pop sound on every button press across the app
+ */
+export function initGlobalButtonSounds() {
+  if (typeof window === "undefined") return () => {};
+
+  const handleGlobalClick = (e) => {
+    try {
+      const target = e.target;
+      if (!target || typeof target.closest !== "function") return;
+
+      // Detect button or clickable button-like element
+      const btn = target.closest("button, [role='button'], input[type='button'], input[type='submit'], .btn, .clickable-pill");
+      if (
+        btn &&
+        !btn.disabled &&
+        btn.getAttribute("aria-disabled") !== "true" &&
+        btn.getAttribute("data-no-pop") !== "true"
+      ) {
+        playPopSound();
+      }
+    } catch (err) {
+      // Safe fallback
+    }
+  };
+
+  // Use capture phase so all button clicks register reliably
+  window.addEventListener("click", handleGlobalClick, true);
+
+  return () => {
+    window.removeEventListener("click", handleGlobalClick, true);
+  };
+}
 export function playSuccessChime() {
   if (isSoundsMuted()) return;
   const ctx = getAudioContext();
@@ -122,31 +198,6 @@ export function playRetryGentleSound() {
   osc.stop(now + 0.26);
 }
 
-/**
- * Soft soothing tap sound (like a friendly bubble pop)
- */
-export function playTapSound() {
-  if (isSoundsMuted()) return;
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
-  const now = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(440, now);
-  osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
-
-  gain.gain.setValueAtTime(0.12, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-
-  osc.start(now);
-  osc.stop(now + 0.1);
-}
 
 /**
  * Delightful blend chime when two words combine (honey + bee)
