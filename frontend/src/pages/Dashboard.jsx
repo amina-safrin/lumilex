@@ -21,9 +21,6 @@ import {
   Clock,
   GraduationCap,
 } from "lucide-react";
-import DuolingoPath from "../components/DuolingoPath";
-import LessonPlayerModal from "../components/LessonPlayerModal";
-import { generateBirdbrainLesson } from "../utils/birdbrainEngine";
 import { getLearningState, getGardenStage, setLearningStateLocally } from "../utils/learningRewards";
 import { getErrorTrackerState, setErrorTrackerLocally } from "../utils/errorTracker";
 import { useChild } from "../context/ChildContext";
@@ -87,7 +84,6 @@ function Dashboard() {
   const [rewardModal, setRewardModal] = useState(null);
   const [isClaimingReward, setIsClaimingReward] = useState(false);
   const [rewardClaimed, setRewardClaimed] = useState(false);
-  const [activeLessonSession, setActiveLessonSession] = useState(null);
 
   useEffect(() => {
     const refreshRewards = () => {
@@ -240,22 +236,6 @@ function Dashboard() {
       setIsClaimingReward(false);
       setRewardModal(null);
     }
-  };
-
-  const handleStartLesson = (lessonId, unitId) => {
-    playTapSound();
-    const session = generateBirdbrainLesson({
-      targetLessonId: lessonId,
-      userId,
-      mistakesMap: errorTracker.mistakes,
-      errorTracker,
-    });
-    setActiveLessonSession(session);
-  };
-
-  const handleLessonCompleted = (stats) => {
-    setRewards(getLearningState(userId));
-    setErrorTracker(getErrorTrackerState(userId));
   };
 
   // =====================================================
@@ -703,43 +683,6 @@ function Dashboard() {
           <button className="dashboard-reward-button" onClick={() => navigate("/learning-journey")}>Open learning journey <ArrowRight size={15} /></button>
         </section>
 
-        {/* =================================================
-            LESSONS: DUOLINGO LEVEL-BY-LEVEL LEARNING PATH
-        ================================================= */}
-        <section className="dashboard-lessons-section">
-          <div className="dashboard-lessons-header-row">
-            <div>
-              <div className="dashboard-lessons-tag">
-                <GraduationCap size={16} />
-                <span>DUOLINGO-STYLE LESSONS · BIRDBRAIN AI</span>
-              </div>
-              <h2>My Learning Lessons</h2>
-              <p>
-                Bite-sized phonics quests starting from alphabets and letter sounds, adapted to your performance by Birdbrain.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              className="dashboard-view-all-lessons-btn"
-              onClick={() => {
-                playTapSound();
-                navigate("/lessons");
-              }}
-            >
-              <span>Explore All Units 🗺️</span>
-              <ArrowRight size={15} />
-            </button>
-          </div>
-
-          <DuolingoPath
-            learningState={rewards}
-            errorTracker={errorTracker}
-            onStartLesson={handleStartLesson}
-            childName={childName}
-            activeUnitFilter={Math.min(rewards.currentLevel || 1, 6)}
-          />
-        </section>
 
         {/* =================================================
             TODAY'S ADVENTURE
@@ -1192,19 +1135,6 @@ function Dashboard() {
         </section>
 
       </main>
-
-      {/* ===================================================
-          MODAL LESSON PLAYER (ACTIVE DUOLINGO-STYLE LESSON)
-      =================================================== */}
-      {activeLessonSession && (
-        <LessonPlayerModal
-          lessonSession={activeLessonSession}
-          onClose={() => setActiveLessonSession(null)}
-          onCompleted={handleLessonCompleted}
-          userId={userId}
-          childName={childName}
-        />
-      )}
 
     </div>
   );
