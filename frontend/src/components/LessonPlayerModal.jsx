@@ -76,8 +76,8 @@ export default function LessonPlayerModal({
         setPlacedLetters([]);
       }
 
-      // Automatically speak prompt in child's voice
-      const speech = currentQ.audioPrompt || currentQ.prompt;
+      // Read only the question prompt in child's voice without overly explaining
+      const speech = currentQ.prompt;
       const timer = setTimeout(() => {
         speakText(speech, { rate: 0.88, pitch: 1.38 });
       }, 350);
@@ -244,13 +244,6 @@ export default function LessonPlayerModal({
       playGentleEncouragement();
       setMistakesList((prev) => [...prev, currentQ]);
       recordChildMistake(currentQ, unit?.id || 1, userId);
-
-      // Gentle dyslexia hint in child's voice
-      if (currentQ.hintSpeech || currentQ.hint) {
-        setTimeout(() => {
-          speakText(currentQ.hintSpeech || currentQ.hint, { rate: 0.86, pitch: 1.38 });
-        }, 300);
-      }
     }
   };
 
@@ -366,9 +359,9 @@ export default function LessonPlayerModal({
                 className="duo-speaker-btn"
                 onClick={() => {
                   playPopSound();
-                  speakText(currentQ.audioPrompt || currentQ.prompt, { rate: 0.88, pitch: 1.38 });
+                  speakText(currentQ.prompt, { rate: 0.88, pitch: 1.38 });
                 }}
-                title="Hear aloud in child's voice"
+                title="Hear question in child's voice"
               >
                 <Volume2 size={22} />
               </button>
