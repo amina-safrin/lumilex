@@ -474,41 +474,6 @@
   box-shadow: 0 4px 0 #9a3412;
 }
 
-.reading-tries-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  background: #f8fafc;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 12px;
-  margin-top: 2px;
-}
-
-.try-pip {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #cbd5e1;
-  transition: all 0.2s ease;
-}
-
-.try-pip.used {
-  background: #f97316;
-  box-shadow: 0 0 6px rgba(249, 115, 22, 0.5);
-  transform: scale(1.15);
-}
-
-.tries-label-text {
-  font-family: "Nunito", sans-serif;
-  font-size: 11px;
-  font-weight: 800;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-left: 2px;
-}
-
 .speak-instruction-text {
   font-family: "Nunito", sans-serif;
   font-size: 13px;

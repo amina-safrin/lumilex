@@ -81,6 +81,35 @@ function isDyslexiaMatch(spoken, expected) {
   return false;
 }
 
+const LETTER_PHONICS = {
+  a: ["a", "ay", "ah", "ey", "apple"],
+  b: ["b", "be", "bee", "buh", "ball", "b"],
+  c: ["c", "see", "sea", "kuh", "cat"],
+  d: ["d", "de", "dee", "duh", "dog"],
+  e: ["e", "ee", "eh", "egg"],
+  f: ["f", "ef", "eff", "fuh", "fish"],
+  g: ["g", "jee", "guh", "go"],
+  h: ["h", "aitch", "ha", "huh", "hat"],
+  i: ["i", "eye", "ih", "igloo"],
+  j: ["j", "jay", "juh", "jump"],
+  k: ["k", "kay", "kuh", "kite"],
+  l: ["l", "el", "ell", "luh", "lion"],
+  m: ["m", "em", "muh", "moon"],
+  n: ["n", "en", "nuh", "nest"],
+  o: ["o", "oh", "ox"],
+  p: ["p", "pee", "puh", "pig"],
+  q: ["q", "cue", "kyu", "queen"],
+  r: ["r", "ar", "are", "er", "ruh", "ring"],
+  s: ["s", "es", "ess", "suh", "sun"],
+  t: ["t", "tee", "tuh", "top"],
+  u: ["u", "you", "uh", "up"],
+  v: ["v", "vee", "vuh", "van"],
+  w: ["w", "double you", "wuh", "web"],
+  x: ["x", "ex", "fox"],
+  y: ["y", "why", "yuh", "yo-yo"],
+  z: ["z", "zee", "zed", "zuh", "zebra"],
+};
+
 export default function LessonPlayerModal({
   lessonSession,
   onClose,
@@ -100,7 +129,7 @@ export default function LessonPlayerModal({
   const [finishStats, setFinishStats] = useState(null);
   const [wordsReadCount, setWordsReadCount] = useState(0);
 
-  // 3-Tries and Orange State for Speech / Reading Questions
+  // Quiet attempt counter & Orange State
   const [attemptCount, setAttemptCount] = useState(0);
   const [isOrangeExhausted, setIsOrangeExhausted] = useState(false);
 
@@ -112,8 +141,11 @@ export default function LessonPlayerModal({
   const recognitionRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-  const recordingTimerRef = useRef(null);
+  const chunkTimerRef = useRef(null);
+  const sessionTimerRef = useRef(null);
   const isListeningRef = useRef(false);
+  const isAnswerCheckedRef = useRef(false);
+  const accumulatedTranscriptRef = useRef("");
 
   // Letter Building state (type: "letter_build")
   const [placedLetters, setPlacedLetters] = useState([]);
@@ -122,21 +154,26 @@ export default function LessonPlayerModal({
   const currentQ = questions[currentIndex] || {};
   const progressPercent = Math.round(((currentIndex) / questions.length) * 100);
 
+  // Sync isAnswerCheckedRef with state
+  useEffect(() => {
+    isAnswerCheckedRef.current = isAnswerChecked;
+  }, [isAnswerChecked]);
+
   // Initialize question state whenever currentIndex changes
   useEffect(() => {
     if (currentQ?.prompt) {
       setSelectedAnswer(null);
       setIsAnswerChecked(false);
+      isAnswerCheckedRef.current = false;
       setIsCorrect(false);
       setHeardTranscript("");
       setSpeechError("");
       setIsListening(false);
+      isListeningRef.current = false;
       setIsWhisperProcessing(false);
       setAttemptCount(0);
       setIsOrangeExhausted(false);
-      setIsWhisperProcessing(false);
-      setAttemptCount(0);
-      setIsOrangeExhausted(false);
+      accumulatedTranscriptRef.current = "";
 
       // Setup letter building bank if letter_build type
       if (currentQ.type === "letter_build" && currentQ.letterBank) {
@@ -168,20 +205,17 @@ export default function LessonPlayerModal({
   }, []);
 
   // -------------------------------------------------------
-  // SEND AUDIO TO WHISPER MODEL (SAME AS STORY READING)
+  // SEND AUDIO CHUNK TO ACCURATE WHISPER SERVICE
   // -------------------------------------------------------
   const sendAudioToWhisper = async (audioBlob) => {
-    if (!audioBlob || audioBlob.size === 0) {
-      evaluateSpokenReading(heardTranscript || "", true);
-      return;
-    }
+    if (!audioBlob || audioBlob.size === 0) return;
 
     try {
       setIsWhisperProcessing(true);
       const formData = new FormData();
-      formData.append("audio", audioBlob, "lesson_reading.webm");
+      formData.append("audio", audioBlob, "reading.webm");
 
-      // Prime Whisper decoder with target word or sentence for pinpoint child accuracy
+      // Prime Whisper decoder with upcoming lesson vocabulary for accuracy
       const promptContext = currentQ.targetWord || currentQ.sentence || currentQ.answer || "";
       if (promptContext) {
         formData.append("prompt", promptContext);
@@ -198,26 +232,26 @@ export default function LessonPlayerModal({
 
       if (!response.ok) {
         console.warn("Whisper speech route notice:", data.error || response.statusText);
-        evaluateSpokenReading(heardTranscript || "", true);
         return;
       }
 
       if (data.text && data.text.trim()) {
-        const transcript = data.text.trim();
-        setHeardTranscript(transcript);
-        evaluateSpokenReading(transcript, true);
-      } else {
-        evaluateSpokenReading(heardTranscript || "", true);
+        const transcriptChunk = data.text.trim();
+        // Append to accumulated transcript for this attempt
+        accumulatedTranscriptRef.current = (
+          accumulatedTranscriptRef.current + " " + transcriptChunk
+        ).trim();
+        setHeardTranscript(accumulatedTranscriptRef.current);
+        evaluateSpokenReading(accumulatedTranscriptRef.current, false);
       }
     } catch (err) {
       console.warn("Whisper connection notice:", err.message);
       setIsWhisperProcessing(false);
-      evaluateSpokenReading(heardTranscript || "", true);
     }
   };
 
   // -------------------------------------------------------
-  // FAILED SPEECH ATTEMPT HANDLER (3 TRIES THEN ORANGE CARD)
+  // FAILED SPEECH ATTEMPT HANDLER (QUIET 3 ATTEMPTS)
   // -------------------------------------------------------
   const handleFailedAttempt = (spokenText = "") => {
     stopSpeechRecognition();
@@ -226,17 +260,16 @@ export default function LessonPlayerModal({
 
     if (nextAttempts < 3) {
       playGentleEncouragement();
-      const triesLeft = 3 - nextAttempts;
-      setSpeechError(
-        `Almost! Try saying it again (${triesLeft} ${triesLeft === 1 ? "try" : "tries"} left) 🎙️`
-      );
+      // Friendly, encouraging prompt without mentioning "chances" or "tries left"
+      setSpeechError("Take a breath and try once more! 🎙️");
     } else {
       // 3 attempts reached! Turn orange and reveal CONTINUE button
       playGentleEncouragement();
       setIsOrangeExhausted(true);
       setIsCorrect(false);
       setIsAnswerChecked(true);
-      setSelectedAnswer(spokenText || "Practiced 3 times");
+      isAnswerCheckedRef.current = true;
+      setSelectedAnswer(spokenText || "Practiced");
       setSpeechError("");
       setMistakesList((prev) => [...prev, currentQ]);
       recordChildMistake(currentQ, unit?.id || 1, userId);
@@ -246,8 +279,8 @@ export default function LessonPlayerModal({
   // -------------------------------------------------------
   // EVALUATE SPOKEN READING (DYSLEXIA & YOUNG CHILD MATCHING)
   // -------------------------------------------------------
-  const evaluateSpokenReading = (spokenText, isFinal = false) => {
-    if (isAnswerChecked) return;
+  const evaluateSpokenReading = (spokenText, isSessionEnd = false) => {
+    if (isAnswerCheckedRef.current || isAnswerChecked) return;
 
     const cleanSpoken = (spokenText || "")
       .toLowerCase()
@@ -255,7 +288,7 @@ export default function LessonPlayerModal({
       .trim();
 
     if (!cleanSpoken) {
-      if (isFinal) {
+      if (isSessionEnd) {
         handleFailedAttempt("");
       }
       return;
@@ -271,19 +304,24 @@ export default function LessonPlayerModal({
 
       let matchedWords = 0;
       targetWords.forEach((tw) => {
-        if (spokenWords.some((sw) => isDyslexiaMatch(sw, tw))) {
+        if (
+          spokenWords.some(
+            (sw) => isDyslexiaMatch(sw, tw) || sw.includes(tw) || tw.includes(sw)
+          )
+        ) {
           matchedWords++;
         }
       });
 
-      // Valid if child read at least 50% of the sentence words or significant spoken content
+      // Child read at least 35% of the sentence words, or significant substring, or matched at least 2 words
       const isMatch =
-        matchedWords >= Math.max(1, Math.ceil(targetWords.length * 0.5)) ||
-        (cleanSpoken.length >= 4 && targetWords.some((tw) => cleanSpoken.includes(tw)));
+        matchedWords >= Math.max(1, Math.floor(targetWords.length * 0.35)) ||
+        cleanSpoken.includes(sentenceTarget) ||
+        (targetWords.length <= 3 && matchedWords >= 1);
 
       if (isMatch) {
         handleSpeakSuccess(spokenText);
-      } else if (isFinal) {
+      } else if (isSessionEnd) {
         handleFailedAttempt(spokenText);
       }
     } else {
@@ -294,61 +332,86 @@ export default function LessonPlayerModal({
         .trim();
       const spokenWords = cleanSpoken.split(/\s+/).filter(Boolean);
 
-      const hasMatch =
-        isDyslexiaMatch(cleanSpoken, targetWord) ||
-        spokenWords.some((sw) => isDyslexiaMatch(sw, targetWord)) ||
-        cleanSpoken.includes(targetWord) ||
-        targetWord.includes(cleanSpoken) ||
-        (cleanSpoken.length >= 1 && targetWord.length === 1 && cleanSpoken[0] === targetWord[0]);
+      let hasMatch = false;
+
+      if (targetWord.length === 1) {
+        // Phonics letters: 'B' -> 'bee', 'buh', 'b', 'ball', etc.
+        const acceptable = LETTER_PHONICS[targetWord] || [targetWord];
+        hasMatch =
+          acceptable.some((p) => cleanSpoken.includes(p)) ||
+          spokenWords.some(
+            (tok) =>
+              acceptable.includes(tok) ||
+              tok.startsWith(targetWord) ||
+              tok === targetWord
+          ) ||
+          cleanSpoken.startsWith(targetWord);
+      } else {
+        hasMatch =
+          isDyslexiaMatch(cleanSpoken, targetWord) ||
+          spokenWords.some((sw) => isDyslexiaMatch(sw, targetWord)) ||
+          cleanSpoken.includes(targetWord) ||
+          targetWord.includes(cleanSpoken);
+      }
 
       if (hasMatch) {
         handleSpeakSuccess(spokenText);
-      } else if (isFinal) {
+      } else if (isSessionEnd) {
         handleFailedAttempt(spokenText);
       }
     }
   };
 
   // -------------------------------------------------------
-  // START MICROPHONE RECORDING WITH WHISPER AI
+  // START MICROPHONE RECORDING (HYBRID CONTINUOUS RECOGNITION)
   // -------------------------------------------------------
   const startSpeechRecognition = async () => {
-    if (isAnswerChecked) return;
+    if (isAnswerCheckedRef.current) return;
     playPopSound();
     setSpeechError("");
     setHeardTranscript("");
+    accumulatedTranscriptRef.current = "";
     setIsWhisperProcessing(false);
 
-    if (recordingTimerRef.current) {
-      clearTimeout(recordingTimerRef.current);
-      recordingTimerRef.current = null;
-    }
+    stopSpeechRecognition();
 
-    // 1. Browser Speech Recognition (instant interim streaming preview)
+    isListeningRef.current = true;
+    setIsListening(true);
+
+    // 1. Browser Speech Recognition (Continuous streaming feedback)
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (SpeechRecognition) {
       try {
         const recognition = new SpeechRecognition();
-        recognition.continuous = false;
+        recognition.continuous = true;
         recognition.interimResults = true;
         recognition.lang = "en-US";
 
         recognition.onresult = (event) => {
-          let transcript = "";
+          let interimChunk = "";
           for (let i = event.resultIndex; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
+            interimChunk += event.results[i][0].transcript + " ";
           }
-          if (transcript.trim()) {
-            setHeardTranscript(transcript.trim());
-            // Only evaluate for early correct match; do not count attempts during live speaking
-            evaluateSpokenReading(transcript.trim(), false);
+          if (interimChunk.trim()) {
+            const combined = (accumulatedTranscriptRef.current + " " + interimChunk).trim();
+            setHeardTranscript(combined);
+            evaluateSpokenReading(combined, false);
           }
         };
 
         recognition.onerror = (err) => {
-          console.log("Browser speech notice:", err.error);
+          console.log("Browser speech notice:", err.error || err);
+        };
+
+        recognition.onend = () => {
+          // Keep continuous if still listening and not completed
+          if (isListeningRef.current && !isAnswerCheckedRef.current) {
+            try {
+              recognition.start();
+            } catch (e) {}
+          }
         };
 
         recognition.start();
@@ -358,7 +421,7 @@ export default function LessonPlayerModal({
       }
     }
 
-    // 2. MediaRecorder stream for accurate local Whisper AI model
+    // 2. MediaRecorder stream with 3.5s rolling chunks to Whisper
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -368,8 +431,6 @@ export default function LessonPlayerModal({
       const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
-      isListeningRef.current = true;
-      setIsListening(true);
 
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
@@ -378,34 +439,50 @@ export default function LessonPlayerModal({
       };
 
       recorder.onstop = async () => {
-        if (stream) {
-          stream.getTracks().forEach((track) => track.stop());
-        }
         if (audioChunksRef.current.length > 0) {
           const audioBlob = new Blob(audioChunksRef.current, {
             type: recorder.mimeType || "audio/webm",
           });
           audioChunksRef.current = [];
           await sendAudioToWhisper(audioBlob);
-        } else {
-          evaluateSpokenReading(heardTranscript || "", true);
+        }
+
+        // Loop next chunk continuously if still listening
+        if (isListeningRef.current && !isAnswerCheckedRef.current) {
+          try {
+            recorder.start();
+            chunkTimerRef.current = setTimeout(() => {
+              if (recorder.state === "recording" && isListeningRef.current) {
+                recorder.stop();
+              }
+            }, 3500);
+          } catch (e) {
+            console.error("Could not loop recorder chunk:", e);
+          }
         }
       };
 
       recorder.onerror = () => {
-        setSpeechError("Microphone error occurred. Please try again or tap 'I Read It!'.");
+        setSpeechError("Microphone error occurred. Tap mic to retry or tap 'I Read It!'.");
         stopSpeechRecognition();
       };
 
       recorder.start();
 
-      // Generous reading time: 15 seconds for sentence, 7.5 seconds for single word
-      const recordingDuration = currentQ.type === "sentence_read" ? 15000 : 7500;
-      recordingTimerRef.current = setTimeout(() => {
-        if (recorder.state === "recording") {
-          stopAndTranscribe();
+      // Trigger first rolling chunk after 3.5s
+      chunkTimerRef.current = setTimeout(() => {
+        if (recorder.state === "recording" && isListeningRef.current) {
+          recorder.stop();
         }
-      }, recordingDuration);
+      }, 3500);
+
+      // Total session window: 16s for sentences, 10s for single words
+      const totalSessionDuration = currentQ.type === "sentence_read" ? 16000 : 10000;
+      sessionTimerRef.current = setTimeout(() => {
+        if (isListeningRef.current && !isAnswerCheckedRef.current) {
+          stopListeningAndEvaluateSession();
+        }
+      }, totalSessionDuration);
     } catch (err) {
       console.warn("Microphone access error:", err);
       setIsListening(false);
@@ -418,13 +495,18 @@ export default function LessonPlayerModal({
     }
   };
 
-  const stopAndTranscribe = () => {
+  // Stop listening when child manually taps mic or when session timer expires
+  const stopListeningAndEvaluateSession = () => {
     isListeningRef.current = false;
     setIsListening(false);
 
-    if (recordingTimerRef.current) {
-      clearTimeout(recordingTimerRef.current);
-      recordingTimerRef.current = null;
+    if (sessionTimerRef.current) {
+      clearTimeout(sessionTimerRef.current);
+      sessionTimerRef.current = null;
+    }
+    if (chunkTimerRef.current) {
+      clearTimeout(chunkTimerRef.current);
+      chunkTimerRef.current = null;
     }
 
     if (recognitionRef.current) {
@@ -434,20 +516,33 @@ export default function LessonPlayerModal({
       recognitionRef.current = null;
     }
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+    if (mediaRecorderRef.current) {
       try {
-        mediaRecorderRef.current.stop();
+        if (mediaRecorderRef.current.state === "recording") {
+          mediaRecorderRef.current.stop();
+        }
       } catch (e) {}
+      if (mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+      }
+      mediaRecorderRef.current = null;
     }
+
+    // Evaluate whatever was accumulated during this attempt
+    evaluateSpokenReading(accumulatedTranscriptRef.current, true);
   };
 
   const stopSpeechRecognition = () => {
     isListeningRef.current = false;
     setIsListening(false);
 
-    if (recordingTimerRef.current) {
-      clearTimeout(recordingTimerRef.current);
-      recordingTimerRef.current = null;
+    if (sessionTimerRef.current) {
+      clearTimeout(sessionTimerRef.current);
+      sessionTimerRef.current = null;
+    }
+    if (chunkTimerRef.current) {
+      clearTimeout(chunkTimerRef.current);
+      chunkTimerRef.current = null;
     }
 
     if (recognitionRef.current) {
@@ -476,6 +571,7 @@ export default function LessonPlayerModal({
     setIsCorrect(true);
     setIsOrangeExhausted(false);
     setIsAnswerChecked(true);
+    isAnswerCheckedRef.current = true;
     setSelectedAnswer(spokenText || currentQ.targetWord || currentQ.sentence || "Spoken");
     setWordsReadCount((prev) => prev + 1);
     playSuccessChime();
@@ -566,13 +662,16 @@ export default function LessonPlayerModal({
       // Synchronously reset all card states so next card is fresh & interactive
       setSelectedAnswer(null);
       setIsAnswerChecked(false);
+      isAnswerCheckedRef.current = false;
       setIsCorrect(false);
       setHeardTranscript("");
       setSpeechError("");
       setIsListening(false);
+      isListeningRef.current = false;
       setIsWhisperProcessing(false);
       setAttemptCount(0);
       setIsOrangeExhausted(false);
+      accumulatedTranscriptRef.current = "";
 
       const nextQ = questions[nextIdx];
       if (nextQ?.type === "letter_build" && nextQ?.letterBank) {
@@ -747,7 +846,7 @@ export default function LessonPlayerModal({
                   <button
                     type="button"
                     className={`speak-mic-hero-btn ${isListening ? "listening-pulse" : ""} ${isCorrect ? "heard-success" : ""} ${isOrangeExhausted ? "heard-orange" : ""}`}
-                    onClick={isListening ? stopAndTranscribe : startSpeechRecognition}
+                    onClick={isListening ? stopListeningAndEvaluateSession : startSpeechRecognition}
                     disabled={isAnswerChecked && isCorrect}
                   >
                     {isListening ? (
@@ -770,22 +869,6 @@ export default function LessonPlayerModal({
                       ? "Good effort! Let's continue 🧡"
                       : "Tap the microphone and read out loud!"}
                   </span>
-
-                  {/* 3-Tries Progress Indicator */}
-                  {!isCorrect && !isOrangeExhausted && (
-                    <div className="reading-tries-indicator">
-                      <span className={`try-pip ${attemptCount >= 1 ? "used" : ""}`} />
-                      <span className={`try-pip ${attemptCount >= 2 ? "used" : ""}`} />
-                      <span className={`try-pip ${attemptCount >= 3 ? "used" : ""}`} />
-                      <span className="tries-label-text">
-                        {attemptCount === 0
-                          ? "3 tries"
-                          : attemptCount === 1
-                          ? "2 tries left"
-                          : "1 try left"}
-                      </span>
-                    </div>
-                  )}
 
                   {heardTranscript && (
                     <div className="heard-transcript-pill">
@@ -947,7 +1030,7 @@ export default function LessonPlayerModal({
                   <button
                     type="button"
                     className={`speak-mic-hero-btn ${isListening ? "listening-pulse" : ""} ${isCorrect ? "heard-success" : ""} ${isOrangeExhausted ? "heard-orange" : ""}`}
-                    onClick={isListening ? stopAndTranscribe : startSpeechRecognition}
+                    onClick={isListening ? stopListeningAndEvaluateSession : startSpeechRecognition}
                     disabled={isAnswerChecked && isCorrect}
                   >
                     {isListening ? (
@@ -969,22 +1052,6 @@ export default function LessonPlayerModal({
                       ? "Good effort! Let's continue 🧡"
                       : "Tap mic and read the sentence out loud!"}
                   </span>
-
-                  {/* 3-Tries Progress Indicator */}
-                  {!isCorrect && !isOrangeExhausted && (
-                    <div className="reading-tries-indicator">
-                      <span className={`try-pip ${attemptCount >= 1 ? "used" : ""}`} />
-                      <span className={`try-pip ${attemptCount >= 2 ? "used" : ""}`} />
-                      <span className={`try-pip ${attemptCount >= 3 ? "used" : ""}`} />
-                      <span className="tries-label-text">
-                        {attemptCount === 0
-                          ? "3 tries"
-                          : attemptCount === 1
-                          ? "2 tries left"
-                          : "1 try left"}
-                      </span>
-                    </div>
-                  )}
 
                   {heardTranscript && (
                     <div className="heard-transcript-pill">
@@ -1157,9 +1224,9 @@ export default function LessonPlayerModal({
                 <div className="feedback-msg">
                   <span className="feedback-orange-emoji" style={{ fontSize: 28, lineHeight: 1 }}>🧡</span>
                   <div>
-                    <strong style={{ color: "#c2410c" }}>Good Try! Keep Going</strong>
+                    <strong style={{ color: "#c2410c" }}>Good Effort! Let's Keep Going 🧡</strong>
                     <span style={{ color: "#9a3412" }}>
-                      You gave it 3 great tries! Let's move to the next one.
+                      Practice makes progress! Tap continue to move forward.
                     </span>
                   </div>
                 </div>
