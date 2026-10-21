@@ -100,6 +100,10 @@ export default function LessonPlayerModal({
   const [finishStats, setFinishStats] = useState(null);
   const [wordsReadCount, setWordsReadCount] = useState(0);
 
+  // 3-Tries and Orange State for Speech / Reading Questions
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [isOrangeExhausted, setIsOrangeExhausted] = useState(false);
+
   // Whisper AI & Voice Recognition state
   const [isListening, setIsListening] = useState(false);
   const [isWhisperProcessing, setIsWhisperProcessing] = useState(false);
@@ -128,6 +132,11 @@ export default function LessonPlayerModal({
       setSpeechError("");
       setIsListening(false);
       setIsWhisperProcessing(false);
+      setAttemptCount(0);
+      setIsOrangeExhausted(false);
+      setIsWhisperProcessing(false);
+      setAttemptCount(0);
+      setIsOrangeExhausted(false);
 
       // Setup letter building bank if letter_build type
       if (currentQ.type === "letter_build" && currentQ.letterBank) {
@@ -162,7 +171,10 @@ export default function LessonPlayerModal({
   // SEND AUDIO TO WHISPER MODEL (SAME AS STORY READING)
   // -------------------------------------------------------
   const sendAudioToWhisper = async (audioBlob) => {
-    if (!audioBlob || audioBlob.size === 0) return;
+    if (!audioBlob || audioBlob.size === 0) {
+      evaluateSpokenReading(heardTranscript || "", true);
+      return;
+    }
 
     try {
       setIsWhisperProcessing(true);
@@ -186,6 +198,7 @@ export default function LessonPlayerModal({
 
       if (!response.ok) {
         console.warn("Whisper speech route notice:", data.error || response.statusText);
+        evaluateSpokenReading(heardTranscript || "", true);
         return;
       }
 
@@ -193,23 +206,66 @@ export default function LessonPlayerModal({
         const transcript = data.text.trim();
         setHeardTranscript(transcript);
         evaluateSpokenReading(transcript, true);
+      } else {
+        evaluateSpokenReading(heardTranscript || "", true);
       }
     } catch (err) {
       console.warn("Whisper connection notice:", err.message);
       setIsWhisperProcessing(false);
+      evaluateSpokenReading(heardTranscript || "", true);
+    }
+  };
+
+  // -------------------------------------------------------
+  // FAILED SPEECH ATTEMPT HANDLER (3 TRIES THEN ORANGE CARD)
+  // -------------------------------------------------------
+  const handleFailedAttempt = (spokenText = "") => {
+    stopSpeechRecognition();
+    const nextAttempts = attemptCount + 1;
+    setAttemptCount(nextAttempts);
+
+    if (nextAttempts < 3) {
+      playGentleEncouragement();
+      const triesLeft = 3 - nextAttempts;
+      setSpeechError(
+        `Almost! Try saying it again (${triesLeft} ${triesLeft === 1 ? "try" : "tries"} left) 🎙️`
+      );
+    } else {
+      // 3 attempts reached! Turn orange and reveal CONTINUE button
+      playGentleEncouragement();
+      setIsOrangeExhausted(true);
+      setIsCorrect(false);
+      setIsAnswerChecked(true);
+      setSelectedAnswer(spokenText || "Practiced 3 times");
+      setSpeechError("");
+      setMistakesList((prev) => [...prev, currentQ]);
+      recordChildMistake(currentQ, unit?.id || 1, userId);
     }
   };
 
   // -------------------------------------------------------
   // EVALUATE SPOKEN READING (DYSLEXIA & YOUNG CHILD MATCHING)
   // -------------------------------------------------------
-  const evaluateSpokenReading = (spokenText, isWhisper = false) => {
-    if (!spokenText || isAnswerChecked) return;
+  const evaluateSpokenReading = (spokenText, isFinal = false) => {
+    if (isAnswerChecked) return;
 
-    const cleanSpoken = spokenText.toLowerCase().replace(/[.,!?;:"'()[\]{}]/g, "").trim();
+    const cleanSpoken = (spokenText || "")
+      .toLowerCase()
+      .replace(/[.,!?;:"'()[\]{}]/g, "")
+      .trim();
+
+    if (!cleanSpoken) {
+      if (isFinal) {
+        handleFailedAttempt("");
+      }
+      return;
+    }
 
     if (currentQ.type === "sentence_read") {
-      const sentenceTarget = (currentQ.sentence || "").toLowerCase().replace(/[.,!?;:"'()[\]{}]/g, "").trim();
+      const sentenceTarget = (currentQ.sentence || "")
+        .toLowerCase()
+        .replace(/[.,!?;:"'()[\]{}]/g, "")
+        .trim();
       const targetWords = sentenceTarget.split(/\s+/).filter(Boolean);
       const spokenWords = cleanSpoken.split(/\s+/).filter(Boolean);
 
@@ -221,12 +277,21 @@ export default function LessonPlayerModal({
       });
 
       // Valid if child read at least 50% of the sentence words or significant spoken content
-      if (matchedWords >= Math.max(1, Math.ceil(targetWords.length * 0.5)) || cleanSpoken.length >= 4) {
+      const isMatch =
+        matchedWords >= Math.max(1, Math.ceil(targetWords.length * 0.5)) ||
+        (cleanSpoken.length >= 4 && targetWords.some((tw) => cleanSpoken.includes(tw)));
+
+      if (isMatch) {
         handleSpeakSuccess(spokenText);
+      } else if (isFinal) {
+        handleFailedAttempt(spokenText);
       }
     } else {
       // Single word / phonics sound
-      const targetWord = (currentQ.targetWord || currentQ.answer || "").toLowerCase().replace(/[.,!?;:"'()[\]{}]/g, "").trim();
+      const targetWord = (currentQ.targetWord || currentQ.answer || "")
+        .toLowerCase()
+        .replace(/[.,!?;:"'()[\]{}]/g, "")
+        .trim();
       const spokenWords = cleanSpoken.split(/\s+/).filter(Boolean);
 
       const hasMatch =
@@ -238,6 +303,8 @@ export default function LessonPlayerModal({
 
       if (hasMatch) {
         handleSpeakSuccess(spokenText);
+      } else if (isFinal) {
+        handleFailedAttempt(spokenText);
       }
     }
   };
@@ -246,6 +313,7 @@ export default function LessonPlayerModal({
   // START MICROPHONE RECORDING WITH WHISPER AI
   // -------------------------------------------------------
   const startSpeechRecognition = async () => {
+    if (isAnswerChecked) return;
     playPopSound();
     setSpeechError("");
     setHeardTranscript("");
@@ -274,6 +342,7 @@ export default function LessonPlayerModal({
           }
           if (transcript.trim()) {
             setHeardTranscript(transcript.trim());
+            // Only evaluate for early correct match; do not count attempts during live speaking
             evaluateSpokenReading(transcript.trim(), false);
           }
         };
@@ -309,12 +378,17 @@ export default function LessonPlayerModal({
       };
 
       recorder.onstop = async () => {
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+        }
         if (audioChunksRef.current.length > 0) {
           const audioBlob = new Blob(audioChunksRef.current, {
             type: recorder.mimeType || "audio/webm",
           });
           audioChunksRef.current = [];
           await sendAudioToWhisper(audioBlob);
+        } else {
+          evaluateSpokenReading(heardTranscript || "", true);
         }
       };
 
@@ -325,14 +399,13 @@ export default function LessonPlayerModal({
 
       recorder.start();
 
-      // Automatically stop recording after 3.6s to submit audio chunk to Whisper
+      // Generous reading time: 15 seconds for sentence, 7.5 seconds for single word
+      const recordingDuration = currentQ.type === "sentence_read" ? 15000 : 7500;
       recordingTimerRef.current = setTimeout(() => {
         if (recorder.state === "recording") {
-          recorder.stop();
-          setIsListening(false);
-          isListeningRef.current = false;
+          stopAndTranscribe();
         }
-      }, 3600);
+      }, recordingDuration);
     } catch (err) {
       console.warn("Microphone access error:", err);
       setIsListening(false);
@@ -342,6 +415,29 @@ export default function LessonPlayerModal({
       } else {
         setSpeechError("Could not access microphone. Tap 'I Read It!' to continue.");
       }
+    }
+  };
+
+  const stopAndTranscribe = () => {
+    isListeningRef.current = false;
+    setIsListening(false);
+
+    if (recordingTimerRef.current) {
+      clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
+      recognitionRef.current = null;
+    }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {}
     }
   };
 
@@ -372,13 +468,15 @@ export default function LessonPlayerModal({
       }
       mediaRecorderRef.current = null;
     }
+    audioChunksRef.current = [];
   };
 
   const handleSpeakSuccess = (spokenText = "") => {
     stopSpeechRecognition();
     setIsCorrect(true);
+    setIsOrangeExhausted(false);
     setIsAnswerChecked(true);
-    setSelectedAnswer(spokenText || currentQ.targetWord || "Spoken");
+    setSelectedAnswer(spokenText || currentQ.targetWord || currentQ.sentence || "Spoken");
     setWordsReadCount((prev) => prev + 1);
     playSuccessChime();
     setCorrectCount((prev) => prev + 1);
@@ -472,6 +570,9 @@ export default function LessonPlayerModal({
       setHeardTranscript("");
       setSpeechError("");
       setIsListening(false);
+      setIsWhisperProcessing(false);
+      setAttemptCount(0);
+      setIsOrangeExhausted(false);
 
       const nextQ = questions[nextIdx];
       if (nextQ?.type === "letter_build" && nextQ?.letterBank) {
@@ -607,13 +708,16 @@ export default function LessonPlayerModal({
             =============================================== */}
             {currentQ.type === "speak_loud" && (
               <div className="speak-loud-exercise">
-                <div className="target-word-card">
+                <div className={`target-word-card ${isOrangeExhausted ? "orange-text-card" : ""}`}>
                   {currentQ.picture && (
                     <span className="target-word-emoji">{currentQ.picture}</span>
                   )}
                   <h1 className="target-word-text">{currentQ.targetWord || currentQ.answer}</h1>
                   {currentQ.phoneticHint && (
                     <span className="target-phonetic-badge">{currentQ.phoneticHint}</span>
+                  )}
+                  {isOrangeExhausted && (
+                    <span className="target-orange-note">Good try! Practice makes progress 🧡</span>
                   )}
                   {currentQ.syllables && currentQ.syllables.length > 0 && (
                     <div className="syllable-blend-container">
@@ -642,8 +746,8 @@ export default function LessonPlayerModal({
                 <div className="speak-mic-center">
                   <button
                     type="button"
-                    className={`speak-mic-hero-btn ${isListening ? "listening-pulse" : ""} ${isCorrect ? "heard-success" : ""}`}
-                    onClick={isListening ? stopSpeechRecognition : startSpeechRecognition}
+                    className={`speak-mic-hero-btn ${isListening ? "listening-pulse" : ""} ${isCorrect ? "heard-success" : ""} ${isOrangeExhausted ? "heard-orange" : ""}`}
+                    onClick={isListening ? stopAndTranscribe : startSpeechRecognition}
                     disabled={isAnswerChecked && isCorrect}
                   >
                     {isListening ? (
@@ -662,8 +766,26 @@ export default function LessonPlayerModal({
                       ? "Listening... say it out loud! 🎙️"
                       : isCorrect
                       ? "Great reading! 🎉"
+                      : isOrangeExhausted
+                      ? "Good effort! Let's continue 🧡"
                       : "Tap the microphone and read out loud!"}
                   </span>
+
+                  {/* 3-Tries Progress Indicator */}
+                  {!isCorrect && !isOrangeExhausted && (
+                    <div className="reading-tries-indicator">
+                      <span className={`try-pip ${attemptCount >= 1 ? "used" : ""}`} />
+                      <span className={`try-pip ${attemptCount >= 2 ? "used" : ""}`} />
+                      <span className={`try-pip ${attemptCount >= 3 ? "used" : ""}`} />
+                      <span className="tries-label-text">
+                        {attemptCount === 0
+                          ? "3 tries"
+                          : attemptCount === 1
+                          ? "2 tries left"
+                          : "1 try left"}
+                      </span>
+                    </div>
+                  )}
 
                   {heardTranscript && (
                     <div className="heard-transcript-pill">
@@ -676,7 +798,7 @@ export default function LessonPlayerModal({
                   )}
 
                   {/* Encouraging I-Read-It button so child is never stuck */}
-                  {!isCorrect && (
+                  {!isCorrect && !isOrangeExhausted && (
                     <button
                       type="button"
                       className="speak-pass-btn"
@@ -785,7 +907,7 @@ export default function LessonPlayerModal({
             =============================================== */}
             {currentQ.type === "sentence_read" && (
               <div className="sentence-read-exercise">
-                <div className="sentence-card">
+                <div className={`sentence-card ${isOrangeExhausted ? "orange-text-card" : ""}`}>
                   <div className="sentence-tokens-row">
                     {(currentQ.tokens || currentQ.sentence?.split(" ") || []).map((token, idx) => (
                       <button
@@ -802,6 +924,10 @@ export default function LessonPlayerModal({
                       </button>
                     ))}
                   </div>
+
+                  {isOrangeExhausted && (
+                    <span className="target-orange-note">Good try! Keep going 🧡</span>
+                  )}
 
                   <button
                     type="button"
@@ -820,20 +946,45 @@ export default function LessonPlayerModal({
                 <div className="speak-mic-center">
                   <button
                     type="button"
-                    className={`speak-mic-hero-btn ${isListening ? "listening-pulse" : ""} ${isCorrect ? "heard-success" : ""}`}
-                    onClick={isListening ? stopSpeechRecognition : startSpeechRecognition}
+                    className={`speak-mic-hero-btn ${isListening ? "listening-pulse" : ""} ${isCorrect ? "heard-success" : ""} ${isOrangeExhausted ? "heard-orange" : ""}`}
+                    onClick={isListening ? stopAndTranscribe : startSpeechRecognition}
+                    disabled={isAnswerChecked && isCorrect}
                   >
-                    <Mic size={34} color="#ffffff" />
+                    {isListening ? (
+                      <Mic size={34} color="#ffffff" className="mic-listening-icon" />
+                    ) : isCorrect ? (
+                      <Check size={34} color="#ffffff" />
+                    ) : (
+                      <Mic size={34} color="#ffffff" />
+                    )}
                   </button>
                   <span className="speak-instruction-text">
                     {isWhisperProcessing
                       ? "Listening with Whisper AI... 🧠"
                       : isListening
-                      ? "Listening... read the sentence! 🎙️"
+                      ? "Listening... take your time to read the sentence! 🎙️"
                       : isCorrect
                       ? "Great reading! 🎉"
+                      : isOrangeExhausted
+                      ? "Good effort! Let's continue 🧡"
                       : "Tap mic and read the sentence out loud!"}
                   </span>
+
+                  {/* 3-Tries Progress Indicator */}
+                  {!isCorrect && !isOrangeExhausted && (
+                    <div className="reading-tries-indicator">
+                      <span className={`try-pip ${attemptCount >= 1 ? "used" : ""}`} />
+                      <span className={`try-pip ${attemptCount >= 2 ? "used" : ""}`} />
+                      <span className={`try-pip ${attemptCount >= 3 ? "used" : ""}`} />
+                      <span className="tries-label-text">
+                        {attemptCount === 0
+                          ? "3 tries"
+                          : attemptCount === 1
+                          ? "2 tries left"
+                          : "1 try left"}
+                      </span>
+                    </div>
+                  )}
 
                   {heardTranscript && (
                     <div className="heard-transcript-pill">
@@ -845,7 +996,7 @@ export default function LessonPlayerModal({
                     <p className="speech-error-note">{speechError}</p>
                   )}
 
-                  {!isCorrect && (
+                  {!isCorrect && !isOrangeExhausted && (
                     <button
                       type="button"
                       className="speak-pass-btn"
@@ -980,7 +1131,9 @@ export default function LessonPlayerModal({
           <div
             className={`duo-bottom-feedback-bar ${
               isAnswerChecked
-                ? isCorrect
+                ? isOrangeExhausted
+                  ? "state-orange"
+                  : isCorrect
                   ? "state-correct"
                   : "state-incorrect"
                 : "state-pending"
@@ -997,6 +1150,26 @@ export default function LessonPlayerModal({
                   {currentQ.type === "speak_loud" || currentQ.type === "sentence_read"
                     ? "I READ IT! 👍"
                     : "CHECK ANSWER"}
+                </button>
+              </div>
+            ) : isOrangeExhausted ? (
+              <div className="feedback-result-row orange-state">
+                <div className="feedback-msg">
+                  <span className="feedback-orange-emoji" style={{ fontSize: 28, lineHeight: 1 }}>🧡</span>
+                  <div>
+                    <strong style={{ color: "#c2410c" }}>Good Try! Keep Going</strong>
+                    <span style={{ color: "#9a3412" }}>
+                      You gave it 3 great tries! Let's move to the next one.
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="duo-continue-btn orange-continue-btn"
+                  onClick={handleNextQuestion}
+                >
+                  CONTINUE
                 </button>
               </div>
             ) : isCorrect ? (
