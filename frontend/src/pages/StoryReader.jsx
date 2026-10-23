@@ -52,22 +52,50 @@ function levenshteinDistance(a, b) {
   return matrix[b.length][a.length];
 }
 
-function isDyslexiaMatch(spoken, expected) {
-  if (spoken === expected) return true;
-  if (!spoken || !expected) return false;
+function normalizeWord(word) {
+  if (!word) return "";
+  return word
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035']/g, "") // smart single quotes/apostrophes
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036"]/g, "") // smart double quotes
+    .replace(/[\u2013\u2014\-–—]/g, "") // hyphens and dashes
+    .replace(/[.,!?;:()[\]{}…*~_`#/\\]/g, "") // punctuation
+    .trim();
+}
 
-  // 1. Common dyslexia letter transpositions check (b <-> d, p <-> q, m <-> w)
-  const normSpoken = spoken.replace(/d/g, "b").replace(/q/g, "p").replace(/w/g, "m");
-  const normExpected = expected.replace(/d/g, "b").replace(/q/g, "p").replace(/w/g, "m");
+function isDyslexiaMatch(spoken, expected) {
+  if (!spoken || !expected) return false;
+  const s = normalizeWord(spoken);
+  const e = normalizeWord(expected);
+  if (!s || !e) return false;
+  if (s === e) return true;
+
+  // 1. Common dyslexia letter transpositions check (b <-> d, p <-> q, m <-> w, n <-> u)
+  const normSpoken = s
+    .replace(/d/g, "b")
+    .replace(/q/g, "p")
+    .replace(/w/g, "m")
+    .replace(/u/g, "n");
+  const normExpected = e
+    .replace(/d/g, "b")
+    .replace(/q/g, "p")
+    .replace(/w/g, "m")
+    .replace(/u/g, "n");
   if (normSpoken === normExpected) return true;
 
-  // 2. Levenshtein edit distance for minor pronunciation stumbles or accents
-  const dist = levenshteinDistance(spoken, expected);
-  if (expected.length <= 3 && dist <= 1) return true;
-  if (expected.length > 3 && dist <= 2) return true;
+  // 2. Inflection / Stemming match (running -> run, cats -> cat, jumped -> jump)
+  const stripEndings = (w) => w.replace(/(ing|tion|sion|ed|er|est|ly|es|s)$/i, "");
+  const stemS = stripEndings(s);
+  const stemE = stripEndings(e);
+  if (stemS && stemE && stemS === stemE) return true;
 
-  // 3. Substring match for prefixes/suffixes
-  if (expected.length >= 5 && (spoken.startsWith(expected) || expected.startsWith(spoken))) {
+  // 3. Levenshtein edit distance for minor pronunciation stumbles or accents
+  const dist = levenshteinDistance(s, e);
+  if (e.length <= 3 && dist <= 1) return true;
+  if (e.length > 3 && dist <= 2) return true;
+
+  // 4. Substring / compound prefix match
+  if (e.length >= 4 && (s.startsWith(e) || e.startsWith(s))) {
     return true;
   }
 
@@ -122,6 +150,12 @@ export default function StoryReader() {
   const [speechError, setSpeechError] = useState("");
   const [pauseMessage, setPauseMessage] = useState("");
 
+  // Live catching speech & Whisper status
+  const [heardTranscript, setHeardTranscript] = useState("");
+  const [lastCaughtWord, setLastCaughtWord] = useState("");
+  const [justCaughtIndex, setJustCaughtIndex] = useState(null);
+  const [isWhisperProcessing, setIsWhisperProcessing] = useState(false);
+
   // Words that LumiLex has recognized
   const [readWordIndexes, setReadWordIndexes] = useState([]);
 
@@ -146,6 +180,8 @@ export default function StoryReader() {
   const listeningRef = useRef(false);
   const completionRef = useRef(false);
   const expectedWordIndexRef = useRef(0);
+  const readWordIndexesRef = useRef(new Set());
+  const justCaughtTimerRef = useRef(null);
   const pauseTimerRef = useRef(null);
   const recordingTimerRef = useRef(null);
 
@@ -207,13 +243,6 @@ export default function StoryReader() {
     return words;
   };
 
-  const normalizeWord = (word) => {
-    return word
-      .toLowerCase()
-      .replace(/[.,!?;:"'()[\]{}]/g, "")
-      .trim();
-  };
-
   // ==========================================
   // PAUSE TIMER
   // ==========================================
@@ -241,36 +270,41 @@ export default function StoryReader() {
   // PROCESS SPOKEN TEXT (ACCURATE + DYSLEXIA MATCHER)
   // ==========================================
   const processSpokenText = (spokenText) => {
-    if (!content) return;
+    if (!content || !spokenText) return;
+
+    const trimmedSpeech = spokenText.trim();
+    if (!trimmedSpeech) return;
+
+    // Display live transcript caught by Whisper / WebSpeech
+    setHeardTranscript(trimmedSpeech);
 
     const storyWords = getStoryWords();
     if (storyWords.length === 0) return;
 
-    const spokenWords = spokenText
+    const spokenTokens = trimmedSpeech
       .split(/\s+/)
       .map(normalizeWord)
       .filter(Boolean);
 
     let expectedIndex = expectedWordIndexRef.current;
-    const updatedReadWords = [...readWordIndexes];
+    let newlyCaught = false;
+    let latestWord = "";
+    let latestIndex = null;
 
-    for (const spokenWord of spokenWords) {
+    for (const spokenWord of spokenTokens) {
       if (expectedIndex >= storyWords.length) break;
 
-      // Ignore filler sounds
-      if (["um", "uh", "erm", "hmm", "hm", "like", "ah"].includes(spokenWord)) {
+      // Ignore common filler sounds
+      if (["um", "uh", "erm", "hmm", "hm", "like", "ah", "er"].includes(spokenWord)) {
         continue;
       }
 
-      // 5-word lookahead to tolerate pauses or skipped words
+      // Generous lookahead (up to 16 words) to tolerate pauses or skipped small articles
       let matchedIndex = -1;
-      const LOOK_AHEAD = 6;
+      const LOOK_AHEAD = 16;
+      const searchEnd = Math.min(expectedIndex + LOOK_AHEAD, storyWords.length);
 
-      for (
-        let i = expectedIndex;
-        i < Math.min(expectedIndex + LOOK_AHEAD, storyWords.length);
-        i++
-      ) {
+      for (let i = expectedIndex; i < searchEnd; i++) {
         const expectedWord = normalizeWord(storyWords[i].word);
         if (isDyslexiaMatch(spokenWord, expectedWord)) {
           matchedIndex = i;
@@ -280,13 +314,17 @@ export default function StoryReader() {
 
       // Word found
       if (matchedIndex !== -1) {
-        const uniqueIndex = storyWords[matchedIndex].uniqueIndex;
+        newlyCaught = true;
+        latestWord = storyWords[matchedIndex].word;
+        latestIndex = storyWords[matchedIndex].uniqueIndex;
 
-        if (!updatedReadWords.includes(uniqueIndex)) {
-          updatedReadWords.push(uniqueIndex);
+        // Contiguous forward progression: mark all words up to matchedIndex as read
+        for (let fillIdx = expectedIndex; fillIdx <= matchedIndex; fillIdx++) {
+          readWordIndexesRef.current.add(storyWords[fillIdx].uniqueIndex);
         }
 
         expectedIndex = matchedIndex + 1;
+        expectedWordIndexRef.current = expectedIndex;
         setCurrentWordIndex(expectedIndex);
 
         setReadingProgress(
@@ -296,7 +334,7 @@ export default function StoryReader() {
         // Story finished!
         if (expectedIndex >= storyWords.length) {
           expectedWordIndexRef.current = expectedIndex;
-          setReadWordIndexes(updatedReadWords);
+          setReadWordIndexes(Array.from(readWordIndexesRef.current));
           setReadingProgress(100);
           completeStory();
           return;
@@ -304,8 +342,19 @@ export default function StoryReader() {
       }
     }
 
-    expectedWordIndexRef.current = expectedIndex;
-    setReadWordIndexes(updatedReadWords);
+    if (newlyCaught) {
+      setReadWordIndexes(Array.from(readWordIndexesRef.current));
+      if (latestWord) {
+        setLastCaughtWord(latestWord);
+      }
+      if (latestIndex) {
+        setJustCaughtIndex(latestIndex);
+        if (justCaughtTimerRef.current) clearTimeout(justCaughtTimerRef.current);
+        justCaughtTimerRef.current = setTimeout(() => {
+          setJustCaughtIndex(null);
+        }, 1200);
+      }
+    }
   };
 
   // ==========================================
@@ -313,6 +362,7 @@ export default function StoryReader() {
   // ==========================================
   const sendAudioToWhisper = async (audioBlob) => {
     try {
+      setIsWhisperProcessing(true);
       const formData = new FormData();
       formData.append("audio", audioBlob, "reading.webm");
 
@@ -320,7 +370,7 @@ export default function StoryReader() {
       const storyWords = getStoryWords();
       const currentIdx = expectedWordIndexRef.current || 0;
       const promptContext = storyWords
-        .slice(currentIdx, currentIdx + 20)
+        .slice(currentIdx, currentIdx + 25)
         .map((w) => w.word)
         .join(" ");
 
@@ -338,6 +388,8 @@ export default function StoryReader() {
       );
 
       const data = await response.json();
+      setIsWhisperProcessing(false);
+
       if (!response.ok) {
         throw new Error(data.error || "Whisper transcription failed");
       }
@@ -348,8 +400,8 @@ export default function StoryReader() {
         processSpokenText(data.text);
       }
     } catch (error) {
+      setIsWhisperProcessing(false);
       console.error("Whisper request failed:", error);
-      // Soft reassurance, don't halt the child's session
     }
   };
 
@@ -373,9 +425,14 @@ export default function StoryReader() {
       setSpeechError("");
       setPauseMessage("");
 
+      readWordIndexesRef.current = new Set();
       setReadWordIndexes([]);
       setCurrentWordIndex(0);
       setReadingProgress(0);
+      setHeardTranscript("");
+      setLastCaughtWord("");
+      setJustCaughtIndex(null);
+      setIsWhisperProcessing(false);
       expectedWordIndexRef.current = 0;
       completionRef.current = false;
 
@@ -436,7 +493,7 @@ export default function StoryReader() {
         }
       };
 
-      recorder.onstop = async () => {
+      recorder.onstop = () => {
         if (audioChunks.length === 0) return;
 
         const audioBlob = new Blob(audioChunks, {
@@ -444,9 +501,7 @@ export default function StoryReader() {
         });
         audioChunks = [];
 
-        await sendAudioToWhisper(audioBlob);
-
-        // Continue recording smoothly
+        // 1. IMMEDIATELY restart the recorder so 0 milliseconds of speech are lost!
         if (listeningRef.current && !completionRef.current) {
           try {
             recorder.start();
@@ -454,11 +509,14 @@ export default function StoryReader() {
               if (recorder.state === "recording" && listeningRef.current) {
                 recorder.stop();
               }
-            }, 3800);
+            }, 3000);
           } catch (error) {
             console.error("Could not restart recorder:", error);
           }
         }
+
+        // 2. Transcribe in the background without blocking the microphone
+        sendAudioToWhisper(audioBlob);
       };
 
       recorder.onerror = () => {
@@ -471,7 +529,7 @@ export default function StoryReader() {
         if (recorder.state === "recording" && listeningRef.current) {
           recorder.stop();
         }
-      }, 3800);
+      }, 3000);
     } catch (error) {
       console.error("Microphone error:", error);
       stopAllListening();
@@ -488,7 +546,13 @@ export default function StoryReader() {
   const stopAllListening = () => {
     listeningRef.current = false;
     setIsListening(false);
+    setIsWhisperProcessing(false);
     clearPauseTimer();
+
+    if (justCaughtTimerRef.current) {
+      clearTimeout(justCaughtTimerRef.current);
+      justCaughtTimerRef.current = null;
+    }
 
     if (recordingTimerRef.current) {
       clearTimeout(recordingTimerRef.current);
@@ -846,14 +910,36 @@ export default function StoryReader() {
           )}
         </div>
 
-        {/* VOICE STATUS */}
+        {/* VOICE STATUS & LIVE CATCHING TRACKER */}
         <div className="voice-reading-section">
           {isListening && (
-            <div className="lumilex-listening-status">
-              <span className="listening-dot"></span>
-              <div>
-                <strong>LumiLex is listening to your reading...</strong>
-                <p>Read out loud at your own gentle pace 💚</p>
+            <div className="live-speech-tracker-card" role="status" aria-live="polite">
+              <div className="tracker-header">
+                <div className="tracker-badge">
+                  <span className={`live-pulse-dot ${isWhisperProcessing ? "processing" : "listening"}`}></span>
+                  <strong>
+                    {isWhisperProcessing
+                      ? "Listening with Whisper AI... 🧠"
+                      : "LumiLex is listening to your reading... 🎙️"}
+                  </strong>
+                </div>
+
+                {lastCaughtWord && (
+                  <div className="last-caught-pill">
+                    <span className="last-caught-label">Caught:</span>
+                    <span className="last-caught-word">"{lastCaughtWord}"</span>
+                    <Check size={14} className="caught-check" />
+                  </div>
+                )}
+              </div>
+
+              <div className="tracker-transcript-bubble">
+                <span className="transcript-lead">Whisper Heard:</span>
+                <span className="transcript-text">
+                  {heardTranscript
+                    ? `"${heardTranscript}"`
+                    : "Speak out loud — Whisper and LumiLex will catch your words here 🌱"}
+                </span>
               </div>
             </div>
           )}
@@ -892,6 +978,7 @@ export default function StoryReader() {
                 {words.map((word, wordIndex) => {
                   const uniqueIndex = `${paragraphIndex}-${wordIndex}`;
                   const isRead = readWordIndexes.includes(uniqueIndex);
+                  const isJustCaught = justCaughtIndex === uniqueIndex;
                   const isCurrent =
                     currentWordIndex ===
                     storyWords.findIndex(
@@ -900,6 +987,7 @@ export default function StoryReader() {
 
                   let wordClass = "story-word";
                   if (isRead) wordClass += " read";
+                  if (isJustCaught) wordClass += " just-caught";
                   if (isCurrent && isListening) wordClass += " current";
                   if (activeWord === uniqueIndex) wordClass += " active";
 

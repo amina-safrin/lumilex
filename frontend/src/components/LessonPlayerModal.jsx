@@ -59,28 +59,65 @@ function levenshteinDistance(a, b) {
   return matrix[b.length][a.length];
 }
 
+function normalizeToken(str) {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035']/g, "")
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036"]/g, "")
+    .replace(/[\u2013\u2014\-–—]/g, "")
+    .replace(/[.,!?;:()[\]{}…*~_`#/\\]/g, "")
+    .trim();
+}
+
 function isDyslexiaMatch(spoken, expected) {
   if (!spoken || !expected) return false;
-  const s = spoken.toLowerCase().replace(/[.,!?;:"'()[\]{}]/g, "").trim();
-  const e = expected.toLowerCase().replace(/[.,!?;:"'()[\]{}]/g, "").trim();
+  const s = normalizeToken(spoken);
+  const e = normalizeToken(expected);
+  if (!s || !e) return false;
   if (s === e) return true;
 
-  // 1. Common dyslexia letter transpositions (b <-> d, p <-> q, m <-> w)
-  const normSpoken = s.replace(/d/g, "b").replace(/q/g, "p").replace(/w/g, "m");
-  const normExpected = e.replace(/d/g, "b").replace(/q/g, "p").replace(/w/g, "m");
+  // 1. Common dyslexia letter transpositions (b <-> d, p <-> q, m <-> w, n <-> u)
+  const normSpoken = s
+    .replace(/d/g, "b")
+    .replace(/q/g, "p")
+    .replace(/w/g, "m")
+    .replace(/u/g, "n");
+  const normExpected = e
+    .replace(/d/g, "b")
+    .replace(/q/g, "p")
+    .replace(/w/g, "m")
+    .replace(/u/g, "n");
   if (normSpoken === normExpected) return true;
 
-  // 2. Levenshtein edit distance for young speech or minor accents
+  // 2. Inflection match (running -> run, cats -> cat, jumped -> jump)
+  const stripEndings = (w) => w.replace(/(ing|tion|sion|ed|er|est|ly|es|s)$/i, "");
+  const stemS = stripEndings(s);
+  const stemE = stripEndings(e);
+  if (stemS && stemE && stemS === stemE) return true;
+
+  // 3. Levenshtein edit distance for young speech or minor accents
   const dist = levenshteinDistance(s, e);
   if (e.length <= 3 && dist <= 1) return true;
   if (e.length > 3 && dist <= 2) return true;
 
-  // 3. Substring match
+  // 4. Substring match
   if (e.length >= 4 && (s.startsWith(e) || e.startsWith(s) || s.includes(e) || e.includes(s))) {
     return true;
   }
 
   return false;
+}
+
+function isWordCaught(word, transcript) {
+  if (!word || !transcript) return false;
+  const cleanWord = normalizeToken(word);
+  if (!cleanWord) return false;
+  const spokenTokens = transcript
+    .split(/\s+/)
+    .map(normalizeToken)
+    .filter(Boolean);
+  return spokenTokens.some((tok) => isDyslexiaMatch(tok, cleanWord));
 }
 
 const LETTER_PHONICS = {
@@ -442,27 +479,38 @@ export default function LessonPlayerModal({
         }
       };
 
-      recorder.onstop = async () => {
+      recorder.onstop = () => {
         if (audioChunksRef.current.length > 0) {
           const audioBlob = new Blob(audioChunksRef.current, {
             type: recorder.mimeType || "audio/webm",
           });
           audioChunksRef.current = [];
-          await sendAudioToWhisper(audioBlob);
-        }
 
-        // Loop next chunk continuously if still listening
-        if (isListeningRef.current && !isAnswerCheckedRef.current) {
+          // 1. Immediately restart recorder if still active so no audio is lost!
+          if (isListeningRef.current && !isAnswerCheckedRef.current) {
+            try {
+              recorder.start();
+              chunkTimerRef.current = setTimeout(() => {
+                if (recorder.state === "recording" && isListeningRef.current) {
+                  recorder.stop();
+                }
+              }, 3200);
+            } catch (e) {
+              console.error("Could not loop recorder chunk:", e);
+            }
+          }
+
+          // 2. Transcribe in background without blocking microphone
+          sendAudioToWhisper(audioBlob);
+        } else if (isListeningRef.current && !isAnswerCheckedRef.current) {
           try {
             recorder.start();
             chunkTimerRef.current = setTimeout(() => {
               if (recorder.state === "recording" && isListeningRef.current) {
                 recorder.stop();
               }
-            }, 3500);
-          } catch (e) {
-            console.error("Could not loop recorder chunk:", e);
-          }
+            }, 3200);
+          } catch (e) {}
         }
       };
 
@@ -1039,20 +1087,24 @@ export default function LessonPlayerModal({
               <div className="sentence-read-exercise">
                 <div className={`sentence-card ${isOrangeExhausted ? "orange-text-card" : ""}`}>
                   <div className="sentence-tokens-row">
-                    {(currentQ.tokens || currentQ.sentence?.split(" ") || []).map((token, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        className="sentence-word-token"
-                        onClick={() => {
-                          playPopSound();
-                          speakText(token, { rate: 0.85, pitch: 1.38 });
-                        }}
-                        title="Tap to hear word in child's voice"
-                      >
-                        {token}
-                      </button>
-                    ))}
+                    {(currentQ.tokens || currentQ.sentence?.split(" ") || []).map((token, idx) => {
+                      const isCaught = isWordCaught(token, heardTranscript);
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          className={`sentence-word-token ${isCaught ? "token-heard" : ""}`}
+                          onClick={() => {
+                            playPopSound();
+                            speakText(token, { rate: 0.85, pitch: 1.38 });
+                          }}
+                          title="Tap to hear word in child's voice"
+                        >
+                          <span className="token-text">{token}</span>
+                          {isCaught && <span className="token-check-badge">✓</span>}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {isOrangeExhausted && (
