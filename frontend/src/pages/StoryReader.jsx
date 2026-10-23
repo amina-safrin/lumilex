@@ -10,7 +10,12 @@ import {
   Check,
   RotateCcw,
   Sparkles,
-  BookOpen
+  BookOpen,
+  Brain,
+  Award,
+  Target,
+  ArrowRight,
+  Flame,
 } from "lucide-react";
 import "./StoryReader.css";
 
@@ -20,8 +25,12 @@ import {
   playSuccessChime,
   playTapSound,
   playHintSound,
-  getFriendlyVoice
+  getFriendlyVoice,
+  speakText,
 } from "../utils/childAudio";
+import { analyzeStoryReadingErrors } from "../utils/storyErrorAnalyzer";
+import { submitStoryReadingCompletion } from "../utils/gemmaAdaptive";
+import LessonPlayerModal from "../components/LessonPlayerModal";
 
 // =========================================================
 // DYSLEXIA-FRIENDLY PHONETIC & LEVENSHTEIN MATCHER
@@ -118,7 +127,7 @@ function splitSyllables(word) {
 export default function StoryReader() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { userId } = useChild();
+  const { userId, childName = "Reader" } = useChild();
 
   // ==========================================
   // STORY
@@ -172,6 +181,15 @@ export default function StoryReader() {
   const [starsEarned, setStarsEarned] = useState(0);
 
   // ==========================================
+  // GEMMA CLOUD AI PRACTICE & ERROR ANALYSIS
+  // ==========================================
+  const [readingAnalysis, setReadingAnalysis] = useState(null);
+  const [gemmaPracticeSession, setGemmaPracticeSession] = useState(null);
+  const [isGemmaAnalyzing, setIsGemmaAnalyzing] = useState(false);
+  const [activePracticeModal, setActivePracticeModal] = useState(null);
+  const accumulatedTranscriptRef = useRef("");
+
+  // ==========================================
   // REFS
   // ==========================================
   const speechRef = useRef(null);
@@ -205,7 +223,10 @@ export default function StoryReader() {
         const selectedStory = await response.json();
 
         setContent({
+          id: selectedStory.id,
           title: selectedStory.title,
+          topic: selectedStory.topic || "General",
+          difficulty: selectedStory.difficulty || "Beginner",
           paragraphs: selectedStory.content
             .split(/\n\s*\n/)
             .map((paragraph) => paragraph.trim())
@@ -397,6 +418,9 @@ export default function StoryReader() {
       if (data.text && data.text.trim()) {
         setPauseMessage("");
         startPauseTimer();
+        accumulatedTranscriptRef.current = (
+          accumulatedTranscriptRef.current + " " + data.text.trim()
+        ).trim();
         processSpokenText(data.text);
       }
     } catch (error) {
@@ -424,6 +448,7 @@ export default function StoryReader() {
       setActiveWord(null);
       setSpeechError("");
       setPauseMessage("");
+      accumulatedTranscriptRef.current = "";
 
       readWordIndexesRef.current = new Set();
       setReadWordIndexes([]);
@@ -682,13 +707,13 @@ export default function StoryReader() {
   };
 
   // ==========================================
-  // COMPLETE STORY
+  // COMPLETE STORY & GEMMA ERROR ANALYSIS
   // ==========================================
-  const completeStory = () => {
-    if (completionRef.current || !hasStartedReading) return;
+  const completeStory = async (forceFinish = false) => {
+    if (completionRef.current) return;
 
     const storyWords = getStoryWords();
-    if (expectedWordIndexRef.current < storyWords.length) return;
+    if (!forceFinish && expectedWordIndexRef.current < storyWords.length) return;
 
     completionRef.current = true;
     stopAllListening();
@@ -698,10 +723,44 @@ export default function StoryReader() {
     setPauseMessage("");
     setReadingProgress(100);
 
+    // 1. Analyze reading errors (substitutions, mispronunciations, omissions)
+    const analysis = analyzeStoryReadingErrors({
+      storyWords,
+      spokenTranscript: accumulatedTranscriptRef.current,
+      readWordIndexes: Array.from(readWordIndexesRef.current),
+    });
+    setReadingAnalysis(analysis);
+
     recordStoryCompletion(userId);
     setStarsEarned(3);
     playSuccessChime();
     setShowCompletion(true);
+
+    // 2. Request Gemma Cloud to generate personalized practice session targeting caught errors
+    setIsGemmaAnalyzing(true);
+    try {
+      const gemmaRes = await submitStoryReadingCompletion({
+        storyId: id,
+        storyTitle: content?.title || "Story Adventure",
+        storyTopic: content?.topic || "General",
+        accuracy: analysis.accuracy,
+        wordsRead: analysis.wordsReadCount,
+        totalWords: analysis.totalWords,
+        speechTranscript: accumulatedTranscriptRef.current,
+        expectedText: content?.paragraphs?.join(" ") || "",
+        errors: analysis.errors,
+        trickyWords: analysis.trickyWords,
+        userId,
+      });
+
+      if (gemmaRes && gemmaRes.gemmaPractice) {
+        setGemmaPracticeSession(gemmaRes.gemmaPractice);
+      }
+    } catch (err) {
+      console.warn("Gemma story practice fetch error:", err);
+    } finally {
+      setIsGemmaAnalyzing(false);
+    }
   };
 
   const startReading = () => {
@@ -712,6 +771,9 @@ export default function StoryReader() {
     expectedWordIndexRef.current = 0;
     completionRef.current = false;
     setShowCompletion(false);
+    setReadingAnalysis(null);
+    setGemmaPracticeSession(null);
+    accumulatedTranscriptRef.current = "";
 
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -754,32 +816,168 @@ export default function StoryReader() {
     );
   }
 
-  // Completion screen
+  // Completion screen with Gemma AI Practice Session
   if (showCompletion) {
     return (
       <div className="completion-screen">
-        <div className="completion-card">
+        <div className="completion-card gemma-story-completion-card">
           <div className="completion-icon">🎉</div>
-          <h1>Splendid Reading!</h1>
-          <h2>You finished the entire story!</h2>
+          <h1>Splendid Reading, {childName}!</h1>
+          <h2>You explored the whole story!</h2>
           <p className="completion-story-title">{content.title}</p>
+
           <div className="completion-stars">⭐ ⭐ ⭐</div>
-          <div className="stars-reward">+{starsEarned} Stars</div>
-          <p className="completion-message">
-            Every story you read makes your reading skills stronger and brighter.
-          </p>
+          <div className="stars-reward">+3 Stars • +15 Garden Points 🌿</div>
+
+          {/* Reading Metrics Grid */}
+          {readingAnalysis && (
+            <div className="story-metrics-grid">
+              <div className="story-metric-stat">
+                <span className="metric-num">{readingAnalysis.accuracy}%</span>
+                <span className="metric-label">Accuracy</span>
+              </div>
+              <div className="story-metric-stat">
+                <span className="metric-num">
+                  {readingAnalysis.wordsReadCount} / {readingAnalysis.totalWords}
+                </span>
+                <span className="metric-label">Words Caught</span>
+              </div>
+              <div className="story-metric-stat">
+                <span className="metric-num">{readingAnalysis.trickyWords?.length || 0}</span>
+                <span className="metric-label">Tricky Words</span>
+              </div>
+            </div>
+          )}
+
+          {/* Tricky Words Caught Pills */}
+          {readingAnalysis && readingAnalysis.trickyWords?.length > 0 && (
+            <div className="story-tricky-box">
+              <div className="story-tricky-title">
+                <span>🔍 Words Caught for Gentle Practice:</span>
+              </div>
+              <div className="story-tricky-chips">
+                {readingAnalysis.trickyWords.map((word, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className="tricky-word-pill"
+                    onClick={() => speakWord(word, null)}
+                    title="Tap to hear pronunciation"
+                  >
+                    <Volume2 size={13} />
+                    <span>{word}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Substituted Words Detail (Whisper Comparison) */}
+          {readingAnalysis && readingAnalysis.substitutions?.length > 0 && (
+            <div className="story-substitutions-note">
+              <small>
+                🗣️ Caught word sound variations:{" "}
+                {readingAnalysis.substitutions.slice(0, 3).map((sub, i) => (
+                  <span key={i} className="sub-item">
+                    "{sub.expected}" (Whisper heard: "{sub.spoken}")
+                    {i < Math.min(readingAnalysis.substitutions.length, 3) - 1 ? ", " : ""}
+                  </span>
+                ))}
+              </small>
+            </div>
+          )}
+
+          {/* Gemma AI Story Reading Coach Card */}
+          <div className="gemma-story-coach-container">
+            <div className="gemma-coach-card-header">
+              <div className="gemma-badge-icon">
+                <Brain size={18} color="#7c3aed" />
+              </div>
+              <div>
+                <strong>Gemma AI Reading Coach</strong>
+                <p>Personalized from your reading of this story</p>
+              </div>
+            </div>
+
+            {isGemmaAnalyzing ? (
+              <div className="gemma-loading-state">
+                <div className="gemma-pulse-ring"></div>
+                <p>
+                  Gemma Cloud is analyzing your reading stumbles and crafting your custom practice session... 🧠✨
+                </p>
+              </div>
+            ) : gemmaPracticeSession ? (
+              <div className="gemma-coach-content">
+                <p className="gemma-feedback-bubble">
+                  {gemmaPracticeSession.coachFeedback ||
+                    "Awesome job reading out loud! Practice these tricky words to make your reading fluency shine."}
+                </p>
+                {gemmaPracticeSession.errorAnalysis && (
+                  <p className="gemma-phonics-note">
+                    💡 <strong>Coach Tip:</strong> {gemmaPracticeSession.errorAnalysis}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  className="gemma-launch-practice-btn"
+                  onClick={() => {
+                    playTapSound();
+                    setActivePracticeModal({
+                      lesson: {
+                        id: `story-practice-${id}`,
+                        title: `Story Practice: ${content.title}`,
+                        subtitle: "Crafted by Gemma AI",
+                        icon: "📖",
+                        xp: 20,
+                        gemsReward: 8,
+                      },
+                      unit: {
+                        id: 1,
+                        unitNumber: 1,
+                        title: content.title,
+                        icon: "📖",
+                      },
+                      questions: gemmaPracticeSession.practiceQuestions || [],
+                    });
+                  }}
+                >
+                  <Sparkles size={18} />
+                  <span>Start Gemma Practice Session (5 Questions) 🎯</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
+
           <div className="completion-buttons">
             <button
               className="continue-reading-button"
-              onClick={() => setShowCompletion(false)}
+              onClick={() => {
+                setShowCompletion(false);
+                startReading();
+              }}
             >
-              Read Again
+              Read Story Again
             </button>
             <button className="completion-back-button" onClick={backToStories}>
-              Back to Stories
+              Back to Story Library
             </button>
           </div>
         </div>
+
+        {/* Interactive Practice Modal with Gemma's generated questions */}
+        {activePracticeModal && (
+          <LessonPlayerModal
+            lessonSession={activePracticeModal}
+            onClose={() => setActivePracticeModal(null)}
+            onCompleted={(stats) => {
+              setActivePracticeModal(null);
+              playSuccessChime();
+            }}
+            userId={userId}
+            childName={childName}
+          />
+        )}
       </div>
     );
   }
@@ -908,6 +1106,16 @@ export default function StoryReader() {
               ⏹ Stop Mic
             </button>
           )}
+
+          <button
+            type="button"
+            className="finish-reading-btn"
+            onClick={completeStory}
+            title="Finish reading and analyze with Gemma AI"
+          >
+            <Sparkles size={16} />
+            <span>Finish & Analyze 🌟</span>
+          </button>
         </div>
 
         {/* VOICE STATUS & LIVE CATCHING TRACKER */}

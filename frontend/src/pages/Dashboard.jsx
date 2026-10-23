@@ -27,6 +27,7 @@ import { useChild } from "../context/ChildContext";
 import { playTapSound, speakText, playCelebrationFanfare, playGemEarnedSound } from "../utils/childAudio";
 import { getCachedRecommendation, fetchLatestRecommendation } from "../utils/gemmaAdaptive";
 import GemmaAdaptiveCoachCard from "../components/GemmaAdaptiveCoachCard";
+import { getTimeGreeting } from "../utils/timeGreeting";
 import "./Dashboard.css";
 
 // Topic emojis and soft background badges for child-friendly visual appeal
@@ -521,12 +522,11 @@ function Dashboard() {
             </span>
 
             <h1>
-              Good morning, {childName} 🌱
+              {getTimeGreeting(childName).fullGreeting}
             </h1>
 
             <p>
-              Let's make today's reading adventure
-              a little brighter.
+              {getTimeGreeting(childName).subtitle}
             </p>
 
           </div>

@@ -646,4 +646,205 @@ router.get("/adaptive-recommendation", authenticateToken, async (req, res) => {
   }
 });
 
+// =========================================================
+// POST /api/learning/story-reading-complete
+// Records story reading completion, catches errors, invokes Gemma Cloud
+// to create a tailored practice session, and updates personal account progress.
+// =========================================================
+router.post("/story-reading-complete", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const {
+      storyId,
+      storyTitle = "Story Adventure",
+      storyTopic = "General",
+      accuracy = 100,
+      wordsRead = 0,
+      totalWords = 0,
+      speechTranscript = "",
+      expectedText = "",
+      errors = [],
+      trickyWords = [],
+    } = req.body;
+
+    // 1. Fetch child profile for personalization
+    let childName = "Reader";
+    try {
+      const profRes = await pool.query(
+        "SELECT child_name FROM child_profiles WHERE user_id = $1",
+        [userId]
+      );
+      if (profRes.rows.length > 0 && profRes.rows[0].child_name) {
+        childName = profRes.rows[0].child_name;
+      }
+    } catch (e) {}
+
+    // 2. Generate customized Orton-Gillingham practice session with Gemma Cloud
+    const gemmaResult = await gemmaAdaptiveService.generateStoryPracticeSession({
+      storyTitle,
+      storyTopic,
+      expectedText,
+      speechTranscript,
+      identifiedErrors: errors,
+      trickyWords,
+      childName,
+      accuracy,
+    });
+
+    const gemmaPractice = gemmaResult.practiceSession;
+
+    // 3. Save into story_reading_sessions (isolated per user account)
+    let savedSession = null;
+    try {
+      const insertRes = await pool.query(
+        `INSERT INTO story_reading_sessions (
+          user_id, story_id, story_title, accuracy, words_read, total_words,
+          speech_transcript, errors, tricky_words, gemma_practice
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb)
+        RETURNING *`,
+        [
+          userId,
+          storyId ? Number(storyId) : null,
+          storyTitle,
+          Number(accuracy) || 0,
+          Number(wordsRead) || 0,
+          Number(totalWords) || 0,
+          String(speechTranscript || ""),
+          JSON.stringify(errors || []),
+          trickyWords || [],
+          JSON.stringify(gemmaPractice),
+        ]
+      );
+      savedSession = insertRes.rows[0];
+    } catch (dbErr) {
+      console.warn("Could not save to story_reading_sessions:", dbErr.message);
+    }
+
+    // 4. Update individual child's learning_progress (+3 stars, +15 garden points)
+    try {
+      await pool.query(
+        `UPDATE learning_progress
+         SET completed_stories = completed_stories + 1,
+             stars = stars + 3,
+             garden_points = garden_points + 15,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $1`,
+        [userId]
+      );
+    } catch (progErr) {
+      console.warn("Could not increment completed_stories:", progErr.message);
+    }
+
+    // 5. Update learning_mistakes with tricky words caught during reading
+    if (Array.isArray(trickyWords) && trickyWords.length > 0) {
+      for (const word of trickyWords.slice(0, 5)) {
+        const cleanWord = String(word).trim().toLowerCase();
+        if (!cleanWord) continue;
+        try {
+          await pool.query(
+            `INSERT INTO learning_mistakes (user_id, item_key, category, mistake_count, mastered, question_data, last_seen)
+             VALUES ($1, $2, 'story_reading', 1, FALSE, $3::jsonb, CURRENT_TIMESTAMP)
+             ON CONFLICT (user_id, item_key)
+             DO UPDATE SET mistake_count = learning_mistakes.mistake_count + 1,
+                           last_seen = CURRENT_TIMESTAMP`,
+            [
+              userId,
+              cleanWord,
+              JSON.stringify({
+                source: "story_reading",
+                storyTitle,
+                word: cleanWord,
+              }),
+            ]
+          );
+        } catch (mistakeErr) {
+          console.warn("Could not record story mistake:", mistakeErr.message);
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      session: savedSession,
+      gemmaPractice,
+      starsEarned: 3,
+      starsAwarded: 3,
+      gardenPointsEarned: 15,
+    });
+  } catch (error) {
+    console.error("Story reading complete route error:", error);
+    return res.status(500).json({
+      message: "Failed to process story reading completion",
+      details: error.message,
+    });
+  }
+});
+
+// =========================================================
+// GET /api/learning/story-practice-latest
+// Retrieves the latest Gemma story-driven practice session for the account
+// =========================================================
+router.get("/story-practice-latest", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await pool.query(
+      `SELECT id, story_id, story_title, accuracy, gemma_practice, completed_at
+       FROM story_reading_sessions
+       WHERE user_id = $1 AND gemma_practice IS NOT NULL
+       ORDER BY completed_at DESC
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({
+        hasPractice: false,
+        message: "No story practice sessions found yet. Read a story to create one!",
+      });
+    }
+
+    const row = result.rows[0];
+    return res.json({
+      hasPractice: true,
+      sessionId: row.id,
+      storyId: row.story_id,
+      storyTitle: row.story_title,
+      accuracy: row.accuracy,
+      gemmaPractice: row.gemma_practice,
+      completedAt: row.completed_at,
+    });
+  } catch (error) {
+    console.error("Error fetching latest story practice:", error);
+    return res.status(500).json({ message: "Failed to fetch story practice" });
+  }
+});
+
+// =========================================================
+// GET /api/learning/story-sessions
+// Returns history of story readings for the authenticated user
+// =========================================================
+router.get("/story-sessions", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await pool.query(
+      `SELECT id, story_id, story_title, accuracy, words_read, total_words, tricky_words, completed_at
+       FROM story_reading_sessions
+       WHERE user_id = $1
+       ORDER BY completed_at DESC`,
+      [userId]
+    );
+
+    return res.json({
+      success: true,
+      sessions: result.rows,
+    });
+  } catch (error) {
+    console.error("Error fetching story sessions:", error);
+    return res.status(500).json({ message: "Failed to fetch story sessions" });
+  }
+});
+
 module.exports = router;
+

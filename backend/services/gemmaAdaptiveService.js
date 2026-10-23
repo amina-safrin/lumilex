@@ -463,6 +463,233 @@ Provide the structured JSON recommendation.`;
   }
 }
 
+// =========================================================
+// 7. GEMMA STORY ERROR-DRIVEN PRACTICE GENERATOR
+// Transforms caught reading mistakes from Story Library into
+// bespoke, Orton-Gillingham multi-sensory practice sessions.
+// =========================================================
+
+function generateDeterministicStoryPracticeFallback({
+  storyTitle = "Story Adventure",
+  storyTopic = "General",
+  trickyWords = [],
+  identifiedErrors = [],
+  childName = "Reader",
+  accuracy = 100,
+}) {
+  const safeTricky = Array.isArray(trickyWords) && trickyWords.length > 0
+    ? trickyWords.map((w) => String(w).replace(/[^\w]/g, "").trim()).filter(Boolean)
+    : ["story", "friend", "happy"];
+
+  const primaryWord = safeTricky[0] || "story";
+  const secondaryWord = safeTricky[1] || safeTricky[0] || "read";
+  const capitalizedPrimary = primaryWord.charAt(0).toUpperCase() + primaryWord.slice(1);
+  const capitalizedSecondary = secondaryWord.charAt(0).toUpperCase() + secondaryWord.slice(1);
+
+  // Generate letter bank with 2 distractor letters
+  const primaryLetters = primaryWord.toUpperCase().split("");
+  const distractorLetters = ["E", "A", "O", "T", "S"].filter((l) => !primaryLetters.includes(l)).slice(0, 2);
+  const letterBank = [...primaryLetters, ...distractorLetters].sort(() => Math.random() - 0.5);
+
+  const practiceQuestions = [
+    {
+      id: "story-q1",
+      type: "speak_loud",
+      prompt: `Read out loud: ${primaryWord}`,
+      targetWord: primaryWord.toUpperCase(),
+      syllables: [capitalizedPrimary],
+      phoneticHint: primaryWord.toLowerCase().split("").join(" - "),
+      picture: "📖",
+      pictureLabel: capitalizedPrimary,
+      hint: `Take your time! Blend the sounds in ${primaryWord} smoothly. 🌟`,
+    },
+    {
+      id: "story-q2",
+      type: "word_select",
+      prompt: `Which word says ${capitalizedPrimary}?`,
+      picture: "🌟",
+      choices: [
+        capitalizedPrimary,
+        capitalizedPrimary.slice(0, -1) + "t",
+        capitalizedPrimary.charAt(0) + "a" + capitalizedPrimary.slice(2),
+      ].filter((v, i, a) => a.indexOf(v) === i),
+      answer: capitalizedPrimary,
+      hint: `Listen closely: ${capitalizedPrimary} starts with letter ${capitalizedPrimary.charAt(0)}! 💡`,
+    },
+    {
+      id: "story-q3",
+      type: "letter_build",
+      prompt: `Spell the word: ${primaryWord}`,
+      targetWord: primaryWord.toUpperCase(),
+      picture: "🧩",
+      pictureLabel: capitalizedPrimary,
+      letterBank,
+      answer: primaryWord.toUpperCase(),
+      hint: `Tap the letters one by one to spell ${primaryWord}! 🧱`,
+    },
+    {
+      id: "story-q4",
+      type: "speak_loud",
+      prompt: `Read out loud: ${secondaryWord}`,
+      targetWord: secondaryWord.toUpperCase(),
+      syllables: [capitalizedSecondary],
+      phoneticHint: secondaryWord.toLowerCase().split("").join(" - "),
+      picture: "✨",
+      pictureLabel: capitalizedSecondary,
+      hint: `Say ${secondaryWord} out loud to LumiLex! 🎙️`,
+    },
+    {
+      id: "story-q5",
+      type: "sentence_read",
+      prompt: `Read out loud: I love to read ${primaryWord}.`,
+      sentence: `I love to read ${primaryWord}.`,
+      tokens: ["I", "love", "to", "read", `${primaryWord}.`],
+      hint: `Read the friendly story sentence out loud to LumiLex! 📖`,
+    },
+  ];
+
+  return {
+    storyTitle,
+    coachFeedback: `Splendid effort reading "${storyTitle}", ${childName}! You read with bravery and enthusiasm. Here is a custom practice session designed just for you to master these words! 🌟`,
+    errorAnalysis: safeTricky.length > 0
+      ? `We noticed a few tricky sounds in words like "${safeTricky.slice(0, 3).join('", "')}". Practicing them with sound tiles will make them feel familiar and easy!`
+      : "You read the story wonderfully! This quick review will keep your reading superpowers sharp.",
+    identifiedTrickyWords: safeTricky.slice(0, 5),
+    targetedSkill: "word_reading",
+    practiceQuestions,
+    isFallback: true,
+  };
+}
+
+async function generateStoryPracticeSession({
+  storyTitle = "Story Adventure",
+  storyTopic = "General",
+  expectedText = "",
+  speechTranscript = "",
+  identifiedErrors = [],
+  trickyWords = [],
+  childName = "Reader",
+  accuracy = 100,
+}) {
+  const safeTricky = Array.isArray(trickyWords) && trickyWords.length > 0
+    ? trickyWords.map((w) => String(w).replace(/[^\w]/g, "").trim()).filter(Boolean)
+    : [];
+
+  const errorSummary = {
+    storyTitle,
+    storyTopic,
+    accuracyPercent: Number(accuracy) || 0,
+    trickyWords: safeTricky.slice(0, 6),
+    caughtErrorsSample: Array.isArray(identifiedErrors) ? identifiedErrors.slice(0, 5) : [],
+    speechExcerpt: String(speechTranscript || "").slice(0, 300),
+    expectedExcerpt: String(expectedText || "").slice(0, 300),
+  };
+
+  const systemPrompt = `You are the Gemma AI Reading Specialist for LumiLex, supporting young children with dyslexia.
+The child just read the story "${storyTitle}" into the microphone (transcribed by Whisper).
+Your job is to analyze the child's reading errors (substituted, mispronounced, or skipped words) and create a bespoke 5-question multi-sensory Orton-Gillingham practice session.
+
+CRITICAL INSTRUCTIONS:
+1. Treat reading stumbles kindly. For young children with dyslexia, sound substitutions (like b/d reversals or vowel slips) are natural growth opportunities.
+2. The 5 practice questions MUST directly reinforce the tricky words identified: [${safeTricky.slice(0, 5).join(", ")}].
+3. Question types MUST be one of:
+   - "speak_loud": Prompt child to read targetWord aloud to LumiLex (includes syllables, phoneticHint, picture, pictureLabel, hint).
+   - "word_select": 3 clear choices targeting sound discrimination, answer, picture, hint.
+   - "letter_build": Spell the tricky word with a letterBank (targetWord letters + 2 distractors).
+   - "sentence_read": Read aloud a short 4-6 word friendly sentence containing the tricky word (sentence, tokens array, hint).
+4. Output MUST be ONLY valid JSON conforming to this schema:
+{
+  "storyTitle": "${storyTitle}",
+  "coachFeedback": "encouraging 2-sentence feedback for the child with emojis",
+  "errorAnalysis": "child-friendly explanation of the phonics patterns practiced",
+  "identifiedTrickyWords": ["word1", "word2"],
+  "targetedSkill": "word_reading",
+  "practiceQuestions": [
+    {
+      "id": "story-q1",
+      "type": "speak_loud",
+      "prompt": "Read out loud: ...",
+      "targetWord": "...",
+      "syllables": ["..."],
+      "phoneticHint": "...",
+      "picture": "emoji",
+      "pictureLabel": "...",
+      "hint": "..."
+    }
+  ]
+}`;
+
+  const userPrompt = `Here is the story reading error analysis data:
+${JSON.stringify(errorSummary, null, 2)}
+
+Generate the tailored practice session JSON.`;
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userPrompt },
+  ];
+
+  try {
+    const response = await callOllamaChat(messages, {
+      model: OLLAMA_MODEL,
+      timeoutMs: OLLAMA_TIMEOUT_MS,
+    });
+
+    const assistantContent = response?.message?.content || "";
+    let cleaned = assistantContent.trim();
+    if (cleaned.startsWith("```")) {
+      cleaned = cleaned.replace(/^```[a-zA-Z]*\n?/, "").replace(/```$/, "").trim();
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      if (match) parsed = JSON.parse(match[0]);
+      else throw new Error("Could not parse JSON from Gemma response");
+    }
+
+    if (!parsed.practiceQuestions || !Array.isArray(parsed.practiceQuestions) || parsed.practiceQuestions.length === 0) {
+      throw new Error("Gemma did not return practiceQuestions array");
+    }
+
+    return {
+      success: true,
+      modelUsed: response.model || OLLAMA_MODEL,
+      practiceSession: {
+        storyTitle: parsed.storyTitle || storyTitle,
+        coachFeedback: parsed.coachFeedback || `Splendid reading of "${storyTitle}", ${childName}!`,
+        errorAnalysis: parsed.errorAnalysis || "Focused phonics practice for tricky story words.",
+        identifiedTrickyWords: parsed.identifiedTrickyWords || safeTricky,
+        targetedSkill: parsed.targetedSkill || "word_reading",
+        practiceQuestions: parsed.practiceQuestions,
+        isFallback: false,
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  } catch (apiError) {
+    console.warn("Gemma Cloud story practice notice (using Orton-Gillingham fallback):", apiError.message);
+
+    const fallbackSession = generateDeterministicStoryPracticeFallback({
+      storyTitle,
+      storyTopic,
+      trickyWords: safeTricky,
+      identifiedErrors,
+      childName,
+      accuracy,
+    });
+
+    return {
+      success: true,
+      modelUsed: "deterministic-story-fallback",
+      practiceSession: fallbackSession,
+      fallbackReason: apiError.message,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+}
+
 module.exports = {
   OLLAMA_BASE_URL,
   OLLAMA_MODEL,
@@ -474,4 +701,7 @@ module.exports = {
   parseAndValidateModelResponse,
   generateDeterministicFallback,
   generateAdaptiveRecommendation,
+  generateDeterministicStoryPracticeFallback,
+  generateStoryPracticeSession,
 };
+

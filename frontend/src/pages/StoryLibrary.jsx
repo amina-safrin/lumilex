@@ -11,11 +11,14 @@ import {
   Award,
   Heart,
   ChevronRight,
-  Filter
+  Filter,
+  CheckCircle2
 } from "lucide-react";
 import "./StoryLibrary.css";
 import { playTapSound, speakText } from "../utils/childAudio";
 import { useChild } from "../context/ChildContext";
+import { fetchLatestStoryPractice, fetchStorySessions } from "../utils/gemmaAdaptive";
+import LessonPlayerModal from "../components/LessonPlayerModal";
 
 // Topic emojis and soft background badges for child-friendly visual appeal
 const TOPIC_METADATA = {
@@ -58,11 +61,14 @@ function estimateReadingMinutes(content) {
 
 export default function StoryLibrary() {
   const navigate = useNavigate();
-  const { childName } = useChild();
+  const { childName, userId } = useChild();
 
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [stories, setStories] = useState([]);
+  const [storySessions, setStorySessions] = useState([]);
+  const [gemmaStoryPractice, setGemmaStoryPractice] = useState(null);
+  const [activePracticeModal, setActivePracticeModal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -77,32 +83,49 @@ export default function StoryLibrary() {
   ];
 
   useEffect(() => {
-    const fetchStories = async () => {
+    let isMounted = true;
+    const fetchLibraryData = async () => {
       try {
         setLoading(true);
         setError("");
 
-        const response = await fetch("http://localhost:5000/api/stories", {
-          credentials: "include",
-        });
+        const [storiesRes, sessions, practiceData] = await Promise.all([
+          fetch("http://localhost:5000/api/stories", { credentials: "include" }),
+          fetchStorySessions(),
+          fetchLatestStoryPractice(userId),
+        ]);
 
-        if (!response.ok) {
+        if (!storiesRes.ok) {
           throw new Error("Failed to fetch stories");
         }
 
-        const data = await response.json();
+        const data = await storiesRes.json();
         const libraryStories = data.filter((s) => s.story_type === "library");
-        setStories(libraryStories);
+
+        if (isMounted) {
+          setStories(libraryStories);
+          setStorySessions(sessions || []);
+          if (practiceData && practiceData.hasPractice && practiceData.gemmaPractice) {
+            setGemmaStoryPractice(practiceData);
+          }
+        }
       } catch (err) {
-        console.error("Error loading stories:", err);
-        setError("Unable to load stories. Please make sure the server is running.");
+        console.error("Error loading library data:", err);
+        if (isMounted) {
+          setError("Unable to load stories. Please make sure the server is running.");
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchStories();
-  }, []);
+    fetchLibraryData();
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
 
   // Filter by category AND search query
   const filteredStories = useMemo(() => {
@@ -186,6 +209,64 @@ export default function StoryLibrary() {
         </div>
       </section>
 
+      {/* GEMMA AI ADAPTIVE STORY PRACTICE BANNER */}
+      {gemmaStoryPractice && gemmaStoryPractice.gemmaPractice && (
+        <section className="gemma-library-practice-banner">
+          <div className="gemma-banner-left">
+            <div className="gemma-banner-badge">
+              <Sparkles size={14} />
+              <span>Gemma AI Adaptive Practice</span>
+            </div>
+            <h2 className="gemma-banner-title">
+              Special Practice for {gemmaStoryPractice.storyTitle || "Your Recent Story"}
+            </h2>
+            <p className="gemma-banner-desc">
+              {gemmaStoryPractice.gemmaPractice.coachFeedback ||
+                "Gemma AI analyzed the words you read and created 5 custom exercises to strengthen your reading superpowers!"}
+            </p>
+            {gemmaStoryPractice.gemmaPractice.trickyWords?.length > 0 && (
+              <div className="gemma-banner-words">
+                <span className="words-label">Target words:</span>
+                {gemmaStoryPractice.gemmaPractice.trickyWords.map((word, idx) => (
+                  <span key={idx} className="gemma-word-pill">
+                    {word}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="gemma-banner-right">
+            <button
+              type="button"
+              className="gemma-banner-action-btn"
+              onClick={() => {
+                playTapSound();
+                setActivePracticeModal({
+                  lesson: {
+                    id: `story-practice-${gemmaStoryPractice.storyId || "latest"}`,
+                    title: `Story Practice: ${gemmaStoryPractice.storyTitle || "Tale"}`,
+                    subtitle: "Crafted by Gemma AI",
+                    icon: "📖",
+                    xp: 20,
+                    gemsReward: 8,
+                  },
+                  unit: {
+                    id: 1,
+                    unitNumber: 1,
+                    title: gemmaStoryPractice.storyTitle || "Story Practice",
+                    icon: "📖",
+                  },
+                  questions: gemmaStoryPractice.gemmaPractice.practiceQuestions || [],
+                });
+              }}
+            >
+              <Sparkles size={18} />
+              <span>Start Practice (5 Questions) 🎯</span>
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* MAIN CONTENT AREA */}
       <main className="story-content">
         {/* CATEGORY FILTER CHIPS */}
@@ -235,6 +316,7 @@ export default function StoryLibrary() {
               const emoji = getStoryEmoji(story);
               const readTime = estimateReadingMinutes(story.content);
               const meta = TOPIC_METADATA[story.topic] || { color: "#10b981", bg: "#ecfdf5" };
+              const session = storySessions.find((s) => Number(s.story_id) === Number(story.id));
 
               return (
                 <div
@@ -249,6 +331,13 @@ export default function StoryLibrary() {
                     >
                       {story.topic}
                     </span>
+
+                    {session && (
+                      <span className="story-read-badge" title={`Read with ${session.accuracy}% accuracy`}>
+                        <CheckCircle2 size={12} />
+                        <span>Read • {session.accuracy}%</span>
+                      </span>
+                    )}
 
                     <button
                       type="button"
@@ -312,6 +401,20 @@ export default function StoryLibrary() {
           </div>
         )}
       </main>
+
+      {/* Interactive Lesson Modal for Gemma Practice */}
+      {activePracticeModal && (
+        <LessonPlayerModal
+          lessonSession={activePracticeModal}
+          onClose={() => setActivePracticeModal(null)}
+          onCompleted={() => {
+            setActivePracticeModal(null);
+            playTapSound();
+          }}
+          userId={userId}
+          childName={childName}
+        />
+      )}
     </div>
   );
 }

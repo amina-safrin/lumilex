@@ -116,6 +116,11 @@ async function runTestSuite() {
        ON CONFLICT (user_id) DO NOTHING`,
       [testChildUser1.id, testChildUser2.id]
     );
+
+    await pool.query(
+      `DELETE FROM story_reading_sessions WHERE user_id IN ($1, $2)`,
+      [testChildUser1.id, testChildUser2.id]
+    );
   } catch (dbSetupErr) {
     console.warn("Test DB setup notice (proceeding):", dbSetupErr.message);
   }
@@ -346,6 +351,51 @@ async function runTestSuite() {
       assert.ok(stateRes.data.progress);
       assert.ok(stateRes.data.progress.latestRecommendation !== undefined);
       assert.ok(stateRes.data.progress.latestRecommendation !== null);
+    }),
+
+    test("Story Integration: POST /api/learning/story-reading-complete catches errors & triggers Gemma AI session", async () => {
+      const storyRes = await makeRequest("/api/learning/story-reading-complete", {
+        method: "POST",
+        token: tokenUser1,
+        body: {
+          storyId: 1,
+          storyTitle: "The Brave Little Owl",
+          storyTopic: "Animals",
+          accuracy: 70,
+          wordsRead: 14,
+          totalWords: 20,
+          speechTranscript: "the brave wimper owl in the butter night",
+          expectedText: "the brave whisper owl in the flutter night",
+          errors: [
+            { expected: "whisper", spoken: "wimper", type: "substitution" },
+            { expected: "flutter", spoken: "butter", type: "substitution" },
+          ],
+          trickyWords: ["whisper", "flutter"],
+        },
+      });
+
+      assert.strictEqual(storyRes.status, 200);
+      assert.ok(storyRes.data.success);
+      assert.ok(storyRes.data.gemmaPractice);
+      assert.strictEqual(storyRes.data.gemmaPractice.practiceQuestions.length, 5);
+      assert.strictEqual(storyRes.data.starsAwarded, 3);
+    }),
+
+    test("Story Isolation: Account story sessions & tricky words remain strictly isolated between users", async () => {
+      // User 1 should have 1 story session recorded
+      const user1Sessions = await makeRequest("/api/learning/story-sessions", {
+        token: tokenUser1,
+      });
+      assert.strictEqual(user1Sessions.status, 200);
+      assert.strictEqual(user1Sessions.data.sessions.length, 1);
+      assert.strictEqual(user1Sessions.data.sessions[0].story_title, "The Brave Little Owl");
+
+      // User 2 should have 0 story sessions (zero account data leakage)
+      const user2Sessions = await makeRequest("/api/learning/story-sessions", {
+        token: tokenUser2,
+      });
+      assert.strictEqual(user2Sessions.status, 200);
+      assert.strictEqual(user2Sessions.data.sessions.length, 0);
     }),
   ];
 
