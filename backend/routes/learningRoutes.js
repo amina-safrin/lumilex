@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const authenticateToken = require("../middleware/authMiddleware");
+const gemmaAdaptiveService = require("../services/gemmaAdaptiveService");
 
 const router = express.Router();
 
@@ -20,16 +21,16 @@ router.get("/state", authenticateToken, async (req, res) => {
 
     // 1. Fetch or initialize learning progress (stars initially zero)
     let progressRes = await pool.query(
-      `SELECT stars, current_level, garden_points, completed_stories, completed_sessions, badges, levels
+      `SELECT stars, current_level, garden_points, completed_stories, completed_sessions, badges, levels, latest_recommendation
        FROM learning_progress WHERE user_id = $1`,
       [userId]
     );
 
     if (progressRes.rows.length === 0) {
       const init = await pool.query(
-        `INSERT INTO learning_progress (user_id, stars, current_level, garden_points, completed_stories, completed_sessions, badges, levels)
-         VALUES ($1, 0, 1, 0, 0, 0, '[]'::jsonb, '{}'::jsonb)
-         RETURNING stars, current_level, garden_points, completed_stories, completed_sessions, badges, levels`,
+        `INSERT INTO learning_progress (user_id, stars, current_level, garden_points, completed_stories, completed_sessions, badges, levels, latest_recommendation)
+         VALUES ($1, 0, 1, 0, 0, 0, '[]'::jsonb, '{}'::jsonb, NULL)
+         RETURNING stars, current_level, garden_points, completed_stories, completed_sessions, badges, levels, latest_recommendation`,
         [userId]
       );
       progressRes = init;
@@ -124,6 +125,7 @@ router.get("/state", authenticateToken, async (req, res) => {
         completedSessions: progress.completed_sessions ?? 0,
         badges: progress.badges || [],
         levels: progress.levels || {},
+        latestRecommendation: progress.latest_recommendation || null,
       },
       preferences: {
         theme: pref.theme || "forest",
@@ -474,6 +476,173 @@ router.post("/theme", authenticateToken, async (req, res) => {
   } catch (error) {
     console.error("Error saving theme:", error);
     return res.status(500).json({ message: "Failed to save theme" });
+  }
+});
+
+// =========================================================
+// POST /api/learning/adaptive-recommendation
+// Generates a structured Gemma Cloud recommendation for the authenticated child.
+// Enforces deterministic progression and treats speech mismatches as potential variances.
+// =========================================================
+router.post("/adaptive-recommendation", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const {
+      currentLevel = 1,
+      accuracy = 0,
+      correctCount = 0,
+      totalQuestions = 0,
+      skillsExercised = [],
+      speechTranscript = "",
+      expectedPassage = "",
+      trickyItems = [],
+      completedSessions = 0,
+    } = req.body;
+
+    // 1. Fetch child profile for personalized friendly feedback
+    let childName = "Reader";
+    try {
+      const profRes = await pool.query("SELECT child_name FROM child_profiles WHERE user_id = $1", [userId]);
+      if (profRes.rows.length > 0 && profRes.rows[0].child_name) {
+        childName = profRes.rows[0].child_name;
+      }
+    } catch (e) {
+      // Non-fatal, fallback to generic
+    }
+
+    // 2. Fetch known tricky items from database if not supplied in body
+    let activeTrickyKeys = Array.isArray(trickyItems) ? [...trickyItems] : [];
+    if (activeTrickyKeys.length === 0) {
+      try {
+        const trickyRes = await pool.query(
+          "SELECT item_key FROM learning_mistakes WHERE user_id = $1 AND mastered = FALSE ORDER BY mistake_count DESC LIMIT 5",
+          [userId]
+        );
+        activeTrickyKeys = trickyRes.rows.map((r) => r.item_key);
+      } catch (e) {}
+    }
+
+    // 3. Generate adaptive recommendation via Gemma Cloud / Ollama
+    const result = await gemmaAdaptiveService.generateAdaptiveRecommendation({
+      currentLevel: Number(currentLevel) || 1,
+      accuracy: Number(accuracy) || 0,
+      correctCount: Number(correctCount) || 0,
+      totalQuestions: Number(totalQuestions) || 0,
+      skillsExercised,
+      speechTranscript: String(speechTranscript || ""),
+      expectedPassage: String(expectedPassage || ""),
+      trickyItems: activeTrickyKeys,
+      completedSessions: Number(completedSessions) || 0,
+    });
+
+    // Replace child name placeholder if present
+    if (result.recommendation && result.recommendation.encouragingFeedback) {
+      result.recommendation.encouragingFeedback = result.recommendation.encouragingFeedback.replace(/the learner|the child/gi, childName);
+    }
+
+    // 4. Persist recommendation in learning_progress
+    try {
+      await pool.query(
+        `UPDATE learning_progress
+         SET latest_recommendation = $1::jsonb, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $2`,
+        [JSON.stringify(result.recommendation), userId]
+      );
+
+      // Log into history table
+      await pool.query(
+        `INSERT INTO adaptive_recommendations (user_id, level_id, accuracy, progression_decision, recommendation)
+         VALUES ($1, $2, $3, $4, $5::jsonb)`,
+        [
+          userId,
+          Number(currentLevel) || 1,
+          Number(accuracy) || 0,
+          result.deterministicProgression.decision,
+          JSON.stringify(result.recommendation),
+        ]
+      );
+    } catch (dbErr) {
+      console.warn("Failed to persist adaptive recommendation in DB:", dbErr.message);
+    }
+
+    return res.json({
+      success: true,
+      modelUsed: result.modelUsed,
+      recommendation: result.recommendation,
+      deterministicProgression: result.deterministicProgression,
+      speechAnalysis: result.speechAnalysis,
+      generatedAt: result.generatedAt,
+    });
+  } catch (error) {
+    console.error("Adaptive recommendation route error:", error);
+    return res.status(500).json({
+      message: "Failed to generate adaptive recommendation",
+      details: error.message,
+    });
+  }
+});
+
+// =========================================================
+// GET /api/learning/adaptive-recommendation
+// Retrieves the latest adaptive recommendation for the authenticated child.
+// =========================================================
+router.get("/adaptive-recommendation", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await pool.query(
+      `SELECT latest_recommendation, current_level
+       FROM learning_progress WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length > 0 && result.rows[0].latest_recommendation) {
+      return res.json({
+        success: true,
+        hasRecommendation: true,
+        recommendation: result.rows[0].latest_recommendation,
+      });
+    }
+
+    // Check history table as secondary source
+    const histResult = await pool.query(
+      `SELECT recommendation, created_at
+       FROM adaptive_recommendations
+       WHERE user_id = $1
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    if (histResult.rows.length > 0) {
+      return res.json({
+        success: true,
+        hasRecommendation: true,
+        recommendation: histResult.rows[0].recommendation,
+        createdAt: histResult.rows[0].created_at,
+      });
+    }
+
+    // Default welcoming initial guidance
+    const currentLvl = result.rows[0]?.current_level || 1;
+    const defaultRec = gemmaAdaptiveService.generateDeterministicFallback({
+      currentLevel: currentLvl,
+      accuracy: 0,
+      deterministicProgression: {
+        decision: "advance",
+        nextLevel: 1,
+        suitableDifficulty: "standard",
+        rationale: "Welcome! Start your quest at Level 1.",
+      },
+    });
+
+    return res.json({
+      success: true,
+      hasRecommendation: false,
+      recommendation: defaultRec,
+    });
+  } catch (error) {
+    console.error("Error fetching latest adaptive recommendation:", error);
+    return res.status(500).json({ message: "Failed to fetch recommendation" });
   }
 });
 

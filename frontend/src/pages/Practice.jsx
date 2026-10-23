@@ -60,6 +60,8 @@ import {
   getAdaptiveIntensity
 } from "../utils/errorTracker";
 import { useChild } from "../context/ChildContext";
+import { requestAdaptiveRecommendation } from "../utils/gemmaAdaptive";
+import GemmaAdaptiveCoachCard from "../components/GemmaAdaptiveCoachCard";
 
 // =========================================================
 // CHOICE IMAGE & ILLUSTRATION DIRECTORY
@@ -198,6 +200,8 @@ export default function Practice() {
   const [sessionResult, setSessionResult] = useState(null);
   const [isMuted, setIsMuted] = useState(() => isSoundsMuted());
   const [combinedSuccess, setCombinedSuccess] = useState(false);
+  const [gemmaRecommendation, setGemmaRecommendation] = useState(null);
+  const [isGemmaLoading, setIsGemmaLoading] = useState(false);
 
   // Voice recording state
   const [isVoiceListening, setIsVoiceListening] = useState(false);
@@ -403,6 +407,31 @@ export default function Practice() {
       intensity: lessonRewardData.intensity,
     });
 
+    // Checkpoint: Request Gemma Cloud Adaptive Recommendation
+    setIsGemmaLoading(true);
+    requestAdaptiveRecommendation({
+      currentLevel: activeLevel.id === 99 ? 2 : activeLevel.id,
+      accuracy,
+      correctCount,
+      totalQuestions: currentQuestionsList.length,
+      skillsExercised: [activeLevel.skill || "phonics"],
+      speechTranscript: voiceHeardText || "",
+      expectedPassage: currentQuestionsList.map((q) => q.prompt || q.answer || "").join(" "),
+      trickyItems: trickyItems.map((t) => t.key),
+      userId,
+    })
+      .then((res) => {
+        if (res && res.recommendation) {
+          setGemmaRecommendation(res.recommendation);
+        }
+      })
+      .catch((err) => {
+        console.warn("Gemma practice recommendation error:", err);
+      })
+      .finally(() => {
+        setIsGemmaLoading(false);
+      });
+
     if (lessonRewardData.isPerfect) {
       playCelebrationFanfare();
       playGemEarnedSound();
@@ -416,6 +445,7 @@ export default function Practice() {
   const closePractice = () => {
     setActiveLevel(null);
     setSessionResult(null);
+    setGemmaRecommendation(null);
     setCombinedSuccess(false);
     setIsReviewRound(false);
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -869,6 +899,16 @@ export default function Practice() {
                     🔥 {sessionResult.streakDays} Day Streak!
                   </div>
                 </div>
+
+                {/* Gemma Cloud Adaptive Coach Card */}
+                <GemmaAdaptiveCoachCard
+                  recommendation={gemmaRecommendation}
+                  isLoading={isGemmaLoading}
+                  childName={childName}
+                  onActionClick={closePractice}
+                  actionButtonText="Continue Practice Path 🚀"
+                  title="Gemma AI Practice Coach"
+                />
 
                 <button
                   type="button"

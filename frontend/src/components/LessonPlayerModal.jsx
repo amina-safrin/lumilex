@@ -27,6 +27,8 @@ import {
 } from "../utils/childAudio";
 import { recordChildMistake, recordChildSuccess } from "../utils/errorTracker";
 import { finishBirdbrainLesson } from "../utils/birdbrainEngine";
+import { requestAdaptiveRecommendation } from "../utils/gemmaAdaptive";
+import GemmaAdaptiveCoachCard from "./GemmaAdaptiveCoachCard";
 import "./LessonPlayerModal.css";
 
 // =========================================================
@@ -128,6 +130,8 @@ export default function LessonPlayerModal({
   const [isFinished, setIsFinished] = useState(false);
   const [finishStats, setFinishStats] = useState(null);
   const [wordsReadCount, setWordsReadCount] = useState(0);
+  const [gemmaRecommendation, setGemmaRecommendation] = useState(null);
+  const [isGemmaLoading, setIsGemmaLoading] = useState(false);
 
   // Quiet attempt counter & Orange State
   const [attemptCount, setAttemptCount] = useState(0);
@@ -708,6 +712,49 @@ export default function LessonPlayerModal({
 
         setIsFinished(true);
         playCelebrationFanfare();
+
+        // Checkpoint: Request Gemma Cloud Adaptive Recommendation
+        setIsGemmaLoading(true);
+        const expectedPassage = questions
+          .map((q) => q.targetWord || q.sentence || q.answer || q.prompt || "")
+          .join(" ");
+        const trickyKeys = mistakesList
+          .map((m) => m.targetWord || m.answer || m.id)
+          .filter(Boolean);
+
+        const skillByUnit =
+          unit?.id === 1
+            ? "letter_recognition"
+            : unit?.id === 2
+            ? "phonics"
+            : unit?.id === 3
+            ? "sound_blending"
+            : unit?.id === 4
+            ? "word_reading"
+            : "comprehension";
+
+        requestAdaptiveRecommendation({
+          currentLevel: unit?.id || 1,
+          accuracy: finalAccuracy,
+          correctCount,
+          totalQuestions: totalQ,
+          skillsExercised: [skillByUnit],
+          speechTranscript: accumulatedTranscriptRef.current || "",
+          expectedPassage,
+          trickyItems: trickyKeys,
+          userId,
+        })
+          .then((res) => {
+            if (res && res.recommendation) {
+              setGemmaRecommendation(res.recommendation);
+            }
+          })
+          .catch((err) => {
+            console.warn("Gemma recommendation fetch error:", err);
+          })
+          .finally(() => {
+            setIsGemmaLoading(false);
+          });
       } catch (err) {
         console.warn("Error finishing lesson:", err);
         setIsFinished(true);
@@ -1176,6 +1223,16 @@ export default function LessonPlayerModal({
                     : "Great effort reading aloud! Birdbrain will continue encouraging these friendly sounds in your next session."}
                 </p>
               </div>
+
+              {/* Gemma Cloud Adaptive Coach Card */}
+              <GemmaAdaptiveCoachCard
+                recommendation={gemmaRecommendation}
+                isLoading={isGemmaLoading}
+                childName={childName}
+                onActionClick={handleFinishAndReturn}
+                actionButtonText="Continue Learning Path 🚀"
+                title="Gemma AI Reading Coach"
+              />
             </div>
 
             <div className="duo-finish-footer">

@@ -25,6 +25,8 @@ import { getLearningState, getGardenStage, setLearningStateLocally } from "../ut
 import { getErrorTrackerState, setErrorTrackerLocally } from "../utils/errorTracker";
 import { useChild } from "../context/ChildContext";
 import { playTapSound, speakText, playCelebrationFanfare, playGemEarnedSound } from "../utils/childAudio";
+import { getCachedRecommendation, fetchLatestRecommendation } from "../utils/gemmaAdaptive";
+import GemmaAdaptiveCoachCard from "../components/GemmaAdaptiveCoachCard";
 import "./Dashboard.css";
 
 // Topic emojis and soft background badges for child-friendly visual appeal
@@ -84,6 +86,7 @@ function Dashboard() {
   const [rewardModal, setRewardModal] = useState(null);
   const [isClaimingReward, setIsClaimingReward] = useState(false);
   const [rewardClaimed, setRewardClaimed] = useState(false);
+  const [gemmaRecommendation, setGemmaRecommendation] = useState(() => getCachedRecommendation(userId));
 
   useEffect(() => {
     const refreshRewards = () => {
@@ -151,6 +154,13 @@ function Dashboard() {
           if (stateData.progress) {
             setRewards(stateData.progress);
             setLearningStateLocally(stateData.progress, currentUid);
+            if (stateData.progress.latestRecommendation) {
+              setGemmaRecommendation(stateData.progress.latestRecommendation);
+            } else {
+              fetchLatestRecommendation(currentUid).then((rec) => {
+                if (rec) setGemmaRecommendation(rec);
+              });
+            }
           }
           if (stateData.preferences) {
             setErrorTracker(stateData.preferences);
@@ -682,6 +692,22 @@ function Dashboard() {
           <div className="dashboard-reward-item garden-reward"><span className="dashboard-reward-icon">{garden.emoji}</span><div><strong>{garden.name}</strong><small>{garden.description}</small></div></div>
           <button className="dashboard-reward-button" onClick={() => navigate("/learning-journey")}>Open learning journey <ArrowRight size={15} /></button>
         </section>
+
+        {/* GEMMA AI ADAPTIVE READING COACH SNAPSHOT */}
+        {gemmaRecommendation && (
+          <section style={{ margin: "1.25rem 0" }}>
+            <GemmaAdaptiveCoachCard
+              recommendation={gemmaRecommendation}
+              childName={childName}
+              onActionClick={() => {
+                playTapSound();
+                navigate("/practice");
+              }}
+              actionButtonText="Open Practice Quest 🚀"
+              title="Gemma AI Reading Coach"
+            />
+          </section>
+        )}
 
 
         {/* =================================================
