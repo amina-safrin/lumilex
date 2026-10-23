@@ -25,15 +25,16 @@
 .duo-lesson-modal-card {
   position: relative;
   background: #ffffff;
-  border-radius: 24px;
-  max-width: 520px;
-  width: 100%;
-  max-height: min(90vh, 600px);
-  height: 560px;
+  border-radius: 28px;
+  max-width: 780px;
+  width: 95%;
+  max-height: min(94vh, 760px);
+  min-height: 580px;
+  height: auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.8) inset;
   animation: popLessonIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -833,10 +834,44 @@
 
 .feedback-pending-row {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 12px;
+}
+
+.feedback-pending-row.duo-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.duo-hint-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 18px;
+  border: 2px dashed #cbd5e1;
+  background: #f8fafc;
+  color: #64748b;
+  font-family: "Nunito", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  border-radius: 14px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.duo-hint-toggle-btn:hover {
+  background: #fef9c3;
+  border-color: #facc15;
+  color: #854d0e;
+  transform: translateY(-1px);
 }
 
 .duo-check-btn {
+  flex: 1;
   width: 100%;
   padding: 14px 28px;
   border-radius: 16px;
@@ -1424,3 +1459,580 @@
   color: #db2777;
 }
 
+/* =========================================================
+   PRACTICE-STYLE PROMPT & VISUALIZERS IN LESSONS
+   ========================================================= */
+
+.practice-prompt-area {
+  margin-bottom: 16px;
+}
+
+.practice-level-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 16px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1.5px solid #a7f3d0;
+  font-family: "Nunito", sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.practice-prompt-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.practice-prompt-title {
+  margin: 0;
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+  font-size: clamp(19px, 2.4vw, 24px);
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1.35;
+  flex: 1;
+}
+
+.prompt-interactive-word {
+  display: inline;
+  margin: 0 2px;
+  padding: 1px 5px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-bottom: 2px dotted #0284c7;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.prompt-interactive-word:hover {
+  background: #fef08a;
+  color: #854d0e;
+  transform: translateY(-2px);
+}
+
+.listen-prompt-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 12px;
+  border: 1.5px solid #38bdf8;
+  background: #f0f9ff;
+  color: #0284c7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #0284c7;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.listen-prompt-btn:hover {
+  background: #0284c7;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 #0369a1;
+}
+
+.listen-prompt-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #0284c7;
+}
+
+/* =========================================================
+   SCENE PICTURE CARD & SPECIAL VISUALIZERS
+   ========================================================= */
+
+.practice-scene-card {
+  width: 100%;
+  margin: 12px 0 16px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 2px solid #e2e8f0;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.22s ease;
+}
+
+.practice-scene-card:hover {
+  border-color: #38bdf8;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(2, 132, 199, 0.1);
+}
+
+.scene-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.scene-image-frame {
+  width: 70px;
+  height: 70px;
+  min-width: 70px;
+  border-radius: 18px;
+  background: #f0fdf4;
+  border: 2px solid #bbf7d0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.practice-scene-card:hover .scene-image-frame {
+  transform: scale(1.08) rotate(3deg);
+}
+
+.scene-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scene-meta strong {
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.scene-meta small {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scene-listen-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 12px;
+  background: #f0f9ff;
+  border: 1.5px solid #bae6fd;
+  color: #0284c7;
+  font-family: "Nunito", sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* Compound Word Formula Visualizer */
+.compound-formula-box {
+  width: 100%;
+  margin: 12px 0 16px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #fefce8, #fef9c3);
+  border: 2px dashed #fde047;
+  border-radius: 20px;
+}
+
+.compound-formula-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-family: "Nunito", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: #854d0e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.compound-tiles-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.compound-tile {
+  background: #ffffff;
+  border: 2px solid #facc15;
+  border-radius: 16px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.compound-tile:hover {
+  transform: scale(1.05);
+}
+
+.compound-tile-emoji {
+  font-size: 28px;
+}
+
+.compound-tile-text {
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: #713f12;
+}
+
+.compound-math-operator {
+  font-family: "Nunito", sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  color: #ca8a04;
+}
+
+.compound-mystery-tile {
+  background: #fef08a;
+  border: 2px dashed #ca8a04;
+  border-radius: 16px;
+  padding: 10px 18px;
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: #854d0e;
+  animation: pulseMystery 2s infinite;
+}
+
+/* Sound Blend Tiles Box */
+.blend-tiles-box {
+  width: 100%;
+  margin: 12px 0 16px;
+  padding: 14px 18px;
+  background: #f0fdf4;
+  border: 2px solid #bbf7d0;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.blend-phoneme-tile {
+  background: #ffffff;
+  border: 2px solid #22c55e;
+  border-radius: 14px;
+  padding: 10px 16px;
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: #15803d;
+  box-shadow: 0 3px 0 #86efac;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.blend-phoneme-tile:hover {
+  transform: translateY(-2px);
+  background: #dcfce7;
+}
+
+.blend-phoneme-tile:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.blend-arrow {
+  font-size: 18px;
+  color: #16a34a;
+  font-weight: 900;
+}
+
+/* =========================================================
+   CHOICE VOICE READ BAR (SPEAK TO LUMILEX)
+   ========================================================= */
+
+.choice-exercise-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.choice-voice-read-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%);
+  border: 1.5px solid #a7f3d0;
+  border-radius: 16px;
+}
+
+.choice-voice-hint {
+  font-family: "Nunito", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #065f46;
+}
+
+.choice-voice-hint strong {
+  color: #047857;
+  font-weight: 800;
+}
+
+.choice-mic-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 12px;
+  border: 1.5px solid #0284c7;
+  background: #ffffff;
+  color: #0284c7;
+  font-family: "Nunito", sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #0284c7;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.choice-mic-pill-btn:hover {
+  background: #f0f9ff;
+  transform: translateY(-1px);
+}
+
+.choice-mic-pill-btn.listening-pulse {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #dc2626;
+  box-shadow: 0 2px 0 #b91c1c;
+  animation: micPulseWave 1.4s infinite ease-in-out;
+}
+
+.choice-mic-pill-btn.heard {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #10b981;
+  box-shadow: 0 2px 0 #059669;
+}
+
+.choice-voice-heard {
+  font-size: 12px;
+  color: #047857;
+  background: #d1fae5;
+  padding: 4px 12px;
+  border-radius: 10px;
+  width: fit-content;
+  align-self: flex-start;
+  font-family: "Nunito", sans-serif;
+  animation: popInTranscript 0.2s ease;
+}
+
+/* =========================================================
+   PRACTICE CHOICES GRID WITH IMAGES (BEAUTIFUL 3-COLUMN)
+   ========================================================= */
+
+.practice-choices-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.practice-choice-card {
+  position: relative;
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 16px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #cbd5e1;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-family: "OpenDyslexic", "Nunito", sans-serif;
+}
+
+.practice-choice-card:hover:not(:disabled) {
+  transform: translateY(-3px);
+  border-color: #38bdf8;
+  box-shadow: 0 6px 0 #94a3b8;
+}
+
+.practice-choice-card.selected {
+  background: #f0f9ff;
+  border-color: #0284c7;
+  border-width: 2.5px;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 #0369a1;
+}
+
+.practice-choice-card:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #cbd5e1;
+}
+
+/* Choice card revealed states */
+.practice-choice-card.correct-revealed {
+  border-color: #22c55e !important;
+  background: #f0fdf4 !important;
+  box-shadow: 0 4px 0 #16a34a !important;
+}
+
+.practice-choice-card.correct-revealed .choice-text {
+  color: #15803d !important;
+}
+
+.practice-choice-card.incorrect-revealed {
+  border-color: #f87171 !important;
+  background: #fef2f2 !important;
+  box-shadow: 0 4px 0 #dc2626 !important;
+}
+
+.practice-choice-card.incorrect-revealed .choice-text {
+  color: #b91c1c !important;
+}
+
+.choice-index-badge {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  font-family: "Nunito", sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.practice-choice-card.selected .choice-index-badge {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+}
+
+.choice-image-frame {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  margin-top: 4px;
+  margin-bottom: 2px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.practice-choice-card:hover .choice-image-frame {
+  transform: scale(1.12) rotate(3deg);
+}
+
+.choice-sublabel {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.choice-speaker-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0284c7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: all 0.15s ease;
+}
+
+.choice-speaker-btn:hover {
+  opacity: 1;
+  background: #0284c7;
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.choice-check-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0284c7;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: popIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* =========================================================
+   HINT BOX
+   ========================================================= */
+
+.practice-hint-box {
+  margin-top: 8px;
+  margin-bottom: 10px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: #fffbeb;
+  border: 1.5px solid #fde68a;
+  color: #92400e;
+  font-family: "Nunito", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.45;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: slideDown 0.2s ease;
+}
+
+.hint-icon {
+  font-size: 20px;
+}
+
+@media (max-width: 640px) {
+  .practice-choices-grid {
+    grid-template-columns: 1fr;
+  }
+  .choice-voice-read-bar {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+}

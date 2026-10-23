@@ -15,7 +15,9 @@ import {
   RotateCcw,
   Check,
   Brain,
-  ThumbsUp
+  ThumbsUp,
+  Lightbulb,
+  Plus
 } from "lucide-react";
 import {
   speakText,
@@ -25,6 +27,7 @@ import {
   playCelebrationFanfare,
   playGemEarnedSound,
 } from "../utils/childAudio";
+import { CHOICE_VISUALS, getChoiceVisual } from "../utils/choiceVisuals";
 import { recordChildMistake, recordChildSuccess } from "../utils/errorTracker";
 import { finishBirdbrainLesson } from "../utils/birdbrainEngine";
 import { requestAdaptiveRecommendation } from "../utils/gemmaAdaptive";
@@ -173,6 +176,7 @@ export default function LessonPlayerModal({
   // Quiet attempt counter & Orange State
   const [attemptCount, setAttemptCount] = useState(0);
   const [isOrangeExhausted, setIsOrangeExhausted] = useState(false);
+  const [showHint, setShowHint] = useState(false);
 
   // Whisper AI & Voice Recognition state
   const [isListening, setIsListening] = useState(false);
@@ -214,6 +218,7 @@ export default function LessonPlayerModal({
       setIsWhisperProcessing(false);
       setAttemptCount(0);
       setIsOrangeExhausted(false);
+      setShowHint(false);
       accumulatedTranscriptRef.current = "";
 
       // Setup letter building bank if letter_build type
@@ -375,6 +380,7 @@ export default function LessonPlayerModal({
 
       let hasMatch = false;
 
+      // 1. Single word / phonics letter match
       if (targetWord.length === 1) {
         // Phonics letters: 'B' -> 'bee', 'buh', 'b', 'ball', etc.
         const acceptable = LETTER_PHONICS[targetWord] || [targetWord];
@@ -395,8 +401,26 @@ export default function LessonPlayerModal({
           targetWord.includes(cleanSpoken);
       }
 
+      // 2. Choice match: if question has choices, check if child spoke the correct answer
+      const allChoices = (currentQ.choices || currentQ.imageChoices || []).map((c) =>
+        typeof c === "string" ? c : c.label
+      );
+
       if (hasMatch) {
+        if (allChoices.length > 0) {
+          handleSelectChoice(currentQ.answer || targetWord);
+        }
         handleSpeakSuccess(spokenText);
+      } else if (allChoices.length > 0) {
+        const spokenChoice = allChoices.find((c) => isDyslexiaMatch(cleanSpoken, c));
+        if (spokenChoice) {
+          handleSelectChoice(spokenChoice);
+          if (isSessionEnd) {
+            handleFailedAttempt(spokenText);
+          }
+        } else if (isSessionEnd) {
+          handleFailedAttempt(spokenText);
+        }
       } else if (isSessionEnd) {
         handleFailedAttempt(spokenText);
       }
@@ -646,6 +670,27 @@ export default function LessonPlayerModal({
     speakText(text, { rate: 0.88, pitch: 1.38 });
   };
 
+  // Audio helpers for tapping words and scenes
+  const handleHearWord = (word, e) => {
+    if (e) e.stopPropagation();
+    playPopSound();
+    const clean = word.replace(/[.,!?;:"'()[\]{}]/g, "").trim();
+    if (clean) speakText(clean, { rate: 0.85, pitch: 1.38 });
+  };
+
+  const handleHearPrompt = (e) => {
+    if (e) e.stopPropagation();
+    playPopSound();
+    speakText(currentQ.prompt, { rate: 0.88, pitch: 1.38 });
+  };
+
+  const handleHearPicture = (e) => {
+    if (e) e.stopPropagation();
+    playPopSound();
+    const textToSpeak = currentQ.pictureLabel || currentQ.targetWord || currentQ.answer || "";
+    if (textToSpeak) speakText(textToSpeak, { rate: 0.85, pitch: 1.38 });
+  };
+
   // -------------------------------------------------------
   // Letter Building (type: "letter_build") Handlers
   // -------------------------------------------------------
@@ -881,31 +926,149 @@ export default function LessonPlayerModal({
         =================================================== */}
         {!isFinished ? (
           <div className="duo-question-container" key={currentIndex}>
-            {/* Prompt with Child Voice Speaker */}
-            <div className="duo-prompt-row">
-              <h2>{currentQ.prompt}</h2>
-              <button
-                type="button"
-                className="duo-speaker-btn"
-                onClick={() => {
-                  playPopSound();
-                  speakText(currentQ.prompt, { rate: 0.88, pitch: 1.38 });
-                }}
-                title="Hear question in child's voice"
-              >
-                <Volume2 size={22} />
-              </button>
+            {/* 1. Category / Unit Badge and Interactive Prompt Area */}
+            <div className="practice-prompt-area">
+              <div className="practice-level-badge">
+                <span>{unit?.icon || "🍎"}</span>
+                <span>{unit?.title || "Lesson"} • {lesson.title}</span>
+              </div>
+
+              <div className="practice-prompt-row">
+                <h3 className="practice-prompt-title">
+                  {currentQ.prompt.split(" ").map((word, wIdx) => (
+                    <button
+                      key={wIdx}
+                      type="button"
+                      className="prompt-interactive-word"
+                      onClick={(e) => handleHearWord(word, e)}
+                      title="Click to hear word in friendly child voice"
+                    >
+                      {word}
+                    </button>
+                  ))}
+                </h3>
+
+                <button
+                  type="button"
+                  className="listen-prompt-btn"
+                  onClick={handleHearPrompt}
+                  title="Listen to full question"
+                >
+                  <Volume2 size={22} />
+                </button>
+              </div>
             </div>
 
+            {/* 2. Special Visualizer: Sound Blending Phoneme Box */}
+            {currentQ.blendParts && currentQ.blendParts.length > 0 && (
+              <div className="blend-tiles-box">
+                {currentQ.blendParts.map((part, pIdx) => {
+                  const cleanPart = String(part).replace(/\//g, "");
+                  return (
+                    <div key={pIdx} style={{ display: "inline-flex", alignItems: "center", gap: "10px" }}>
+                      <button
+                        type="button"
+                        className="blend-phoneme-tile"
+                        onClick={() => {
+                          playPopSound();
+                          speakText(cleanPart, { rate: 0.82, pitch: 1.38 });
+                        }}
+                        title={`Hear ${cleanPart}`}
+                      >
+                        {cleanPart}
+                      </button>
+                      {pIdx < currentQ.blendParts.length - 1 && (
+                        <span className="blend-arrow">➔</span>
+                      )}
+                    </div>
+                  );
+                })}
+                <span className="blend-arrow">➔</span>
+                <button
+                  type="button"
+                  className="scene-listen-pill"
+                  onClick={handleHearPicture}
+                  style={{ cursor: "pointer" }}
+                >
+                  <span style={{ fontSize: "24px" }}>{currentQ.picture || "🌟"}</span>
+                  <span>Blend sounds!</span>
+                </button>
+              </div>
+            )}
+
+            {/* 3. Special Visualizer: Compound Word Formula Machine */}
+            {currentQ.part1 && currentQ.part2 && (
+              <div className="compound-formula-box">
+                <div className="compound-formula-title">
+                  <span>🍯 Combination Word Machine</span>
+                </div>
+                <div className="compound-tiles-row">
+                  <div
+                    className="compound-tile"
+                    onClick={() => {
+                      playPopSound();
+                      speakText(currentQ.part1, { rate: 0.88, pitch: 1.38 });
+                    }}
+                  >
+                    <span className="compound-tile-emoji">{currentQ.emoji1 || "🍯"}</span>
+                    <span className="compound-tile-text">{currentQ.part1}</span>
+                  </div>
+                  <span className="compound-math-operator">+</span>
+                  <div
+                    className="compound-tile"
+                    onClick={() => {
+                      playPopSound();
+                      speakText(currentQ.part2, { rate: 0.88, pitch: 1.38 });
+                    }}
+                  >
+                    <span className="compound-tile-emoji">{currentQ.emoji2 || "🐝"}</span>
+                    <span className="compound-tile-text">{currentQ.part2}</span>
+                  </div>
+                  <span className="compound-math-operator">=</span>
+                  <div className="compound-mystery-tile">
+                    <span>❓ Read out loud to LumiLex!</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 4. Special Visualizer: Practice Scene Picture Card */}
+            {currentQ.picture && !currentQ.blendParts && !currentQ.part1 && currentQ.type !== "letter_build" && (
+              <div
+                className="practice-scene-card"
+                onClick={handleHearPicture}
+                title="Tap to hear picture description"
+              >
+                <div className="scene-left">
+                  <div className="scene-image-frame">
+                    <span>{currentQ.picture}</span>
+                  </div>
+                  <div className="scene-meta">
+                    {currentQ.pictureLabel && (
+                      <strong>{currentQ.pictureLabel}</strong>
+                    )}
+                    {currentQ.phoneticHint && (
+                      <span className="rhyme-family-ribbon">
+                        🎈 Sound: {currentQ.phoneticHint}
+                      </span>
+                    )}
+                    <small>Tap picture to hear its friendly sound!</small>
+                  </div>
+                </div>
+
+                <div className="scene-listen-pill">
+                  <Volume2 size={16} />
+                  <span>Tap to Hear</span>
+                </div>
+              </div>
+            )}
+
             {/* ===============================================
-                QUESTION TYPE 1: READ OUT LOUD CHALLENGE 🎙️
+                EXERCISE TYPE 1: READ OUT LOUD CHALLENGE 🎙️
             =============================================== */}
             {currentQ.type === "speak_loud" && (
               <div className="speak-loud-exercise">
                 <div className={`target-word-card ${isOrangeExhausted ? "orange-text-card" : ""}`}>
-                  {currentQ.picture && (
-                    <span className="target-word-emoji">{currentQ.picture}</span>
-                  )}
                   <h1 className="target-word-text">{currentQ.targetWord || currentQ.answer}</h1>
                   {currentQ.phoneticHint && (
                     <span className="target-phonetic-badge">{currentQ.phoneticHint}</span>
@@ -957,12 +1120,12 @@ export default function LessonPlayerModal({
                     {isWhisperProcessing
                       ? "Listening with Whisper AI... 🧠"
                       : isListening
-                      ? "Listening... say it out loud! 🎙️"
+                      ? "Listening... say it out loud to LumiLex! 🎙️"
                       : isCorrect
                       ? "Great reading! 🎉"
                       : isOrangeExhausted
                       ? "Good effort! Let's continue 🧡"
-                      : "Tap the microphone and read out loud!"}
+                      : "Tap microphone and read out loud to LumiLex!"}
                   </span>
 
                   {heardTranscript && (
@@ -975,7 +1138,6 @@ export default function LessonPlayerModal({
                     <p className="speech-error-note">{speechError}</p>
                   )}
 
-                  {/* Encouraging I-Read-It button so child is never stuck */}
                   {!isCorrect && !isOrangeExhausted && (
                     <button
                       type="button"
@@ -991,97 +1153,7 @@ export default function LessonPlayerModal({
             )}
 
             {/* ===============================================
-                QUESTION TYPE 2: SELECT THE MATCHING IMAGE 🖼️
-            =============================================== */}
-            {currentQ.type === "image_select" && currentQ.imageChoices && (
-              <div className="image-select-grid">
-                {currentQ.imageChoices.map((choice, idx) => {
-                  const isSelected = selectedAnswer === choice.label;
-                  let cardClass = "image-choice-card";
-                  if (isSelected) cardClass += " selected";
-                  if (isAnswerChecked) {
-                    if (choice.label.toLowerCase() === String(currentQ.answer).toLowerCase()) {
-                      cardClass += " correct-revealed";
-                    } else if (isSelected && !isCorrect) {
-                      cardClass += " incorrect-revealed";
-                    }
-                  }
-
-                  return (
-                    <div
-                      key={`${choice.label}-${idx}`}
-                      className={cardClass}
-                      onClick={() => handleSelectChoice(choice.label)}
-                    >
-                      <button
-                        type="button"
-                        className="image-card-speaker"
-                        onClick={(e) => handlePlayVoiceAudio(e, choice.audio || choice.label)}
-                        title={`Hear ${choice.label}`}
-                      >
-                        <Volume2 size={16} />
-                      </button>
-
-                      <span className="image-card-emoji">{choice.emoji}</span>
-                      <strong className="image-card-label">{choice.label}</strong>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* ===============================================
-                QUESTION TYPE 3: TAP LETTERS TO BUILD WORD 🧱
-            =============================================== */}
-            {currentQ.type === "letter_build" && (
-              <div className="letter-build-exercise">
-                {/* Word Target Illustration */}
-                {currentQ.picture && (
-                  <div className="build-target-banner">
-                    <span className="build-emoji">{currentQ.picture}</span>
-                    <span className="build-label">{currentQ.pictureLabel || "Build the word"}</span>
-                  </div>
-                )}
-
-                {/* Placed Letter Slots */}
-                <div className="build-slots-row">
-                  {placedLetters.length === 0 ? (
-                    <div className="empty-slot-hint">Tap letter tiles below in order...</div>
-                  ) : (
-                    placedLetters.map((tile, idx) => (
-                      <button
-                        key={tile.id}
-                        type="button"
-                        className="placed-letter-tile"
-                        onClick={() => handlePlacedTileClick(tile)}
-                        title="Tap to remove"
-                        disabled={isAnswerChecked}
-                      >
-                        <span>{tile.letter}</span>
-                      </button>
-                    ))
-                  )}
-                </div>
-
-                {/* Available Letter Bank */}
-                <div className="build-bank-row">
-                  {availableBank.map((tile) => (
-                    <button
-                      key={tile.id}
-                      type="button"
-                      className="bank-letter-tile"
-                      onClick={() => handleBankTileClick(tile)}
-                      disabled={isAnswerChecked}
-                    >
-                      <span>{tile.letter}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ===============================================
-                QUESTION TYPE 4: READ SENTENCE ALOUD 🗣️
+                EXERCISE TYPE 2: READ SENTENCE ALOUD 🗣️
             =============================================== */}
             {currentQ.type === "sentence_read" && (
               <div className="sentence-read-exercise">
@@ -1144,12 +1216,12 @@ export default function LessonPlayerModal({
                     {isWhisperProcessing
                       ? "Listening with Whisper AI... 🧠"
                       : isListening
-                      ? "Listening... take your time to read the sentence! 🎙️"
+                      ? "Listening... read the sentence to LumiLex! 🎙️"
                       : isCorrect
                       ? "Great reading! 🎉"
                       : isOrangeExhausted
                       ? "Good effort! Let's continue 🧡"
-                      : "Tap mic and read the sentence out loud!"}
+                      : "Tap mic and read the sentence to LumiLex!"}
                   </span>
 
                   {heardTranscript && (
@@ -1177,48 +1249,148 @@ export default function LessonPlayerModal({
             )}
 
             {/* ===============================================
-                QUESTION TYPE 5: STANDARD CHOICES / WORD SELECT 📖
+                EXERCISE TYPE 3: TAP LETTERS TO BUILD WORD 🧱
             =============================================== */}
-            {(!["speak_loud", "image_select", "letter_build", "sentence_read"].includes(currentQ.type)) && (
-              <>
+            {currentQ.type === "letter_build" && (
+              <div className="letter-build-exercise">
                 {currentQ.picture && (
-                  <div className="duo-mnemonic-card">
-                    <span className="mnemonic-emoji">{currentQ.picture}</span>
-                    {currentQ.pictureLabel && (
-                      <span className="mnemonic-label">{currentQ.pictureLabel}</span>
-                    )}
+                  <div className="build-target-banner">
+                    <span className="build-emoji">{currentQ.picture}</span>
+                    <span className="build-label">{currentQ.pictureLabel || "Build the word"}</span>
                   </div>
                 )}
 
-                <div className="duo-choices-grid">
-                  {(currentQ.choices || []).map((choice, idx) => {
-                    const isSelected = selectedAnswer === choice;
-                    let choiceClass = "duo-choice-card";
+                <div className="build-slots-row">
+                  {placedLetters.length === 0 ? (
+                    <div className="empty-slot-hint">Tap letter tiles below in order...</div>
+                  ) : (
+                    placedLetters.map((tile, idx) => (
+                      <button
+                        key={tile.id}
+                        type="button"
+                        className="placed-letter-tile"
+                        onClick={() => handlePlacedTileClick(tile)}
+                        title="Tap to remove"
+                        disabled={isAnswerChecked}
+                      >
+                        <span>{tile.letter}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
 
-                    if (isSelected) choiceClass += " selected";
+                <div className="build-bank-row">
+                  {availableBank.map((tile) => (
+                    <button
+                      key={tile.id}
+                      type="button"
+                      className="bank-letter-tile"
+                      onClick={() => handleBankTileClick(tile)}
+                      disabled={isAnswerChecked}
+                    >
+                      <span>{tile.letter}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ===============================================
+                EXERCISE TYPE 4: CHOICES WITH IMAGES & READ TO LUMILEX 🖼️
+            =============================================== */}
+            {currentQ.type !== "speak_loud" && currentQ.type !== "sentence_read" && currentQ.type !== "letter_build" && (
+              <div className="choice-exercise-wrapper">
+                {/* Voice Reading to LumiLex Banner */}
+                <div className="choice-voice-read-bar">
+                  <button
+                    type="button"
+                    className={`choice-mic-pill-btn ${isListening ? "listening-pulse" : ""}`}
+                    onClick={isListening ? stopListeningAndEvaluateSession : startSpeechRecognition}
+                  >
+                    <Mic size={18} />
+                    <span>
+                      {isListening
+                        ? "Listening... say your answer out loud!"
+                        : "Read your choice out loud to LumiLex 🎙️"}
+                    </span>
+                  </button>
+                  {heardTranscript && (
+                    <span className="choice-voice-heard">✨ Heard: "{heardTranscript}"</span>
+                  )}
+                </div>
+
+                {/* 3-Column Visual Choices Grid */}
+                <div className="practice-choices-grid">
+                  {(currentQ.choices || currentQ.imageChoices || []).map((choiceItem, idx) => {
+                    const choiceLabel = typeof choiceItem === "string" ? choiceItem : choiceItem.label;
+                    const visual = getChoiceVisual(choiceLabel);
+                    const isSelected = selectedAnswer === choiceLabel;
+                    const letterIndex = String.fromCharCode(65 + idx);
+
+                    let cardClass = "practice-choice-card";
+                    if (isSelected) cardClass += " selected";
                     if (isAnswerChecked) {
-                      if (choice.trim().toLowerCase() === String(currentQ.answer).trim().toLowerCase()) {
-                        choiceClass += " correct-revealed";
+                      if (choiceLabel.toLowerCase() === String(currentQ.answer).toLowerCase()) {
+                        cardClass += " correct-revealed";
                       } else if (isSelected && !isCorrect) {
-                        choiceClass += " incorrect-revealed";
+                        cardClass += " incorrect-revealed";
                       }
                     }
 
                     return (
                       <button
-                        key={`${choice}-${idx}`}
+                        key={`${choiceLabel}-${idx}`}
                         type="button"
-                        className={choiceClass}
-                        onClick={() => handleSelectChoice(choice)}
+                        className={cardClass}
+                        onClick={() => handleSelectChoice(choiceLabel)}
                         disabled={isAnswerChecked}
                       >
-                        <span className="choice-number">{idx + 1}</span>
-                        <span className="choice-text">{choice}</span>
+                        <span className="choice-index-badge">{letterIndex}</span>
+
+                        <div
+                          className="choice-image-frame"
+                          style={{ backgroundColor: visual.bg || "#f8fafc" }}
+                        >
+                          <span>{typeof choiceItem === "object" && choiceItem.emoji ? choiceItem.emoji : visual.icon}</span>
+                        </div>
+
+                        <span className="choice-text">{choiceLabel}</span>
+
+                        {visual.label && visual.label !== choiceLabel && (
+                          <span className="choice-sublabel">{visual.label}</span>
+                        )}
+
+                        <button
+                          type="button"
+                          className="choice-speaker-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            playPopSound();
+                            speakText(choiceLabel, { rate: 0.88, pitch: 1.38 });
+                          }}
+                          title={`Hear ${choiceLabel}`}
+                        >
+                          <Volume2 size={13} />
+                        </button>
+
+                        {isSelected && (
+                          <div className="choice-check-badge">
+                            <Check size={14} />
+                          </div>
+                        )}
                       </button>
                     );
                   })}
                 </div>
-              </>
+              </div>
+            )}
+
+            {/* 5. Gentle Hint Drawer */}
+            {showHint && currentQ.hint && (
+              <div className="practice-hint-box">
+                <span className="hint-icon">💡</span>
+                <span>{currentQ.hint}</span>
+              </div>
             )}
           </div>
         ) : (
@@ -1317,6 +1489,20 @@ export default function LessonPlayerModal({
           >
             {!isAnswerChecked ? (
               <div className="feedback-pending-row">
+                {currentQ.hint && (
+                  <button
+                    type="button"
+                    className="practice-hint-btn"
+                    onClick={() => {
+                      playPopSound();
+                      setShowHint(!showHint);
+                    }}
+                  >
+                    <Lightbulb size={16} />
+                    <span>{showHint ? "Hide Hint" : "Hint"}</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   className="duo-check-btn"
