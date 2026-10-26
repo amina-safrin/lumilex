@@ -665,6 +665,12 @@ router.post("/story-reading-complete", authenticateToken, async (req, res) => {
       expectedText = "",
       errors = [],
       trickyWords = [],
+      readingLevel = "Beginner",
+      correctWords = [],
+      incorrectWords = [],
+      skippedWords = [],
+      unreadWords = [],
+      attempts = [],
     } = req.body;
 
     // 1. Fetch child profile for personalization
@@ -689,6 +695,12 @@ router.post("/story-reading-complete", authenticateToken, async (req, res) => {
       trickyWords,
       childName,
       accuracy,
+      readingLevel,
+      correctWords,
+      incorrectWords,
+      skippedWords,
+      unreadWords,
+      attempts,
     });
 
     const gemmaPractice = gemmaResult.practiceSession;
@@ -696,6 +708,73 @@ router.post("/story-reading-complete", authenticateToken, async (req, res) => {
     // 3. Save into story_reading_sessions (isolated per user account)
     let savedSession = null;
     try {
+      const sessionErrors = {
+        identifiedErrors: Array.isArray(errors) ? errors : [],
+        correctWords: Array.isArray(correctWords) ? correctWords : [],
+        incorrectWords: Array.isArray(incorrectWords) ? incorrectWords : [],
+        skippedWords: Array.isArray(skippedWords) ? skippedWords : [],
+        unreadWords: Array.isArray(unreadWords) ? unreadWords : [],
+        readingLevel: String(readingLevel || "Beginner"),
+        attempts: Array.isArray(attempts) ? attempts : [],
+      };
+
+      let validStoryId = null;
+      if (storyId && !isNaN(Number(storyId))) {
+        try {
+          const storyCheck = await pool.query("SELECT id FROM stories WHERE id = $1", [Number(storyId)]);
+          if (storyCheck.rows.length > 0) {
+            validStoryId = Number(storyId);
+          }
+        } catch (e) {}
+      }
+
+      // Check for rapid duplicate submission of the same session within 10 seconds
+      if (req.body.isRetry !== true) {
+        try {
+          const dupRes = await pool.query(
+            `SELECT id, accuracy, words_read, total_words, tricky_words, gemma_practice, completed_at
+             FROM story_reading_sessions
+             WHERE user_id = $1 AND (story_id = $2 OR ($2 IS NULL AND story_id IS NULL))
+               AND completed_at > NOW() - INTERVAL '10 seconds'
+             ORDER BY completed_at DESC LIMIT 1`,
+            [userId, validStoryId]
+          );
+
+          if (dupRes.rows.length > 0) {
+            const existingRow = dupRes.rows[0];
+            return res.json({
+              success: true,
+              duplicatePrevented: true,
+              isDuplicate: true,
+              session: existingRow,
+              gemmaPractice: existingRow.gemma_practice,
+              starsAwarded: 0,
+              starsEarned: Number(existingRow.accuracy) >= 91 ? 3 : (Number(existingRow.accuracy) >= 76 ? 2 : (Number(existingRow.accuracy) >= 65 ? 1 : 0)),
+              gardenPointsEarned: 0,
+              message: "Story reading session already recorded (duplicate prevented).",
+            });
+          }
+        } catch (dupErr) {
+          console.warn("Duplicate check notice:", dupErr.message);
+        }
+      }
+
+      // Calculate stars strictly based on accuracy thresholds:
+      // 91%–100%: 3 stars
+      // 76%–90%:  2 stars
+      // 65%–75%:  1 star
+      // Below 65% or unreliable: 0 stars
+      let starsAwarded = 0;
+      const isReliableSession = req.body.isReliable !== false && accuracy !== null && accuracy !== undefined;
+      const numAccuracy = Number(accuracy);
+
+      if (isReliableSession && !isNaN(numAccuracy)) {
+        if (numAccuracy >= 91) starsAwarded = 3;
+        else if (numAccuracy >= 76) starsAwarded = 2;
+        else if (numAccuracy >= 65) starsAwarded = 1;
+        else starsAwarded = 0;
+      }
+
       const insertRes = await pool.query(
         `INSERT INTO story_reading_sessions (
           user_id, story_id, story_title, accuracy, words_read, total_words,
@@ -704,13 +783,13 @@ router.post("/story-reading-complete", authenticateToken, async (req, res) => {
         RETURNING *`,
         [
           userId,
-          storyId ? Number(storyId) : null,
+          validStoryId,
           storyTitle,
-          Number(accuracy) || 0,
+          isReliableSession && !isNaN(numAccuracy) ? numAccuracy : 0,
           Number(wordsRead) || 0,
           Number(totalWords) || 0,
           String(speechTranscript || ""),
-          JSON.stringify(errors || []),
+          JSON.stringify(sessionErrors),
           trickyWords || [],
           JSON.stringify(gemmaPractice),
         ]
@@ -720,16 +799,26 @@ router.post("/story-reading-complete", authenticateToken, async (req, res) => {
       console.warn("Could not save to story_reading_sessions:", dbErr.message);
     }
 
-    // 4. Update individual child's learning_progress (+3 stars, +15 garden points)
+    // 4. Update individual child's learning_progress with earned accuracy stars
+    let starsAwarded = 0;
+    const isReliableSession = req.body.isReliable !== false && accuracy !== null && accuracy !== undefined;
+    const numAccuracy = Number(accuracy);
+    if (isReliableSession && !isNaN(numAccuracy)) {
+      if (numAccuracy >= 91) starsAwarded = 3;
+      else if (numAccuracy >= 76) starsAwarded = 2;
+      else if (numAccuracy >= 65) starsAwarded = 1;
+      else starsAwarded = 0;
+    }
+
     try {
       await pool.query(
         `UPDATE learning_progress
          SET completed_stories = completed_stories + 1,
-             stars = stars + 3,
+             stars = stars + $1,
              garden_points = garden_points + 15,
              updated_at = CURRENT_TIMESTAMP
-         WHERE user_id = $1`,
-        [userId]
+         WHERE user_id = $2`,
+        [starsAwarded, userId]
       );
     } catch (progErr) {
       console.warn("Could not increment completed_stories:", progErr.message);
@@ -767,8 +856,10 @@ router.post("/story-reading-complete", authenticateToken, async (req, res) => {
       success: true,
       session: savedSession,
       gemmaPractice,
-      starsEarned: 3,
-      starsAwarded: 3,
+      starsEarned: starsAwarded,
+      starsAwarded,
+      accuracy: isReliableSession ? numAccuracy : null,
+      isReliable: isReliableSession,
       gardenPointsEarned: 15,
     });
   } catch (error) {

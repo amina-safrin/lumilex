@@ -4,6 +4,8 @@ const { GoogleGenAI } = require("@google/genai");
 
 const router = express.Router();
 const pool = require("../db");
+const comprehensionService = require("../services/comprehensionService");
+const storyFallbackService = require("../services/storyFallbackService");
 
 // ============================================
 // GEMINI AI SETUP
@@ -11,7 +13,67 @@ const pool = require("../db");
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    retryOptions: { attempts: 1 },
+    timeout: 10000,
+  },
 });
+
+// ============================================
+// SAFE LOGGING & ERROR CLASSIFICATION
+// ============================================
+
+function safeLogError(label, error) {
+  const secretKey = process.env.GEMINI_API_KEY;
+  let msg = error?.message || String(error);
+  if (secretKey && typeof msg === "string" && msg.includes(secretKey)) {
+    msg = msg.split(secretKey).join("[REDACTED_API_KEY]");
+  }
+  if (typeof msg === "string") {
+    msg = msg.replace(/AIza[0-9A-Za-z-_]{10,}/gi, "[REDACTED_API_KEY]");
+  }
+  const status = error?.status || error?.code || error?.error?.code || error?.response?.status;
+  console.warn(`${label} (status: ${status || "N/A"}): ${msg}`);
+}
+
+function isTransientError(error) {
+  if (!error) return false;
+
+  const status = error.status || error.code || error.error?.code || error.response?.status;
+
+  // Permanent client errors (400 Bad Request, 401 Unauthorized / Invalid Key, 403 Forbidden, 404 Not Found)
+  if (status === 400 || status === 401 || status === 403 || status === 404) {
+    return false;
+  }
+
+  // Temporary HTTP status codes (503 Service Unavailable, 429 Rate Limit, 500 Internal, 502 Bad Gateway, 504 Gateway Timeout)
+  if (status === 429 || status === 503 || status === 500 || status === 502 || status === 504) {
+    return true;
+  }
+
+  // Error message inspection
+  const msg = String(error.message || error.status || error.error?.message || error.error?.status || "").toLowerCase();
+  if (
+    msg.includes("503") ||
+    msg.includes("429") ||
+    msg.includes("504") ||
+    msg.includes("unavailable") ||
+    msg.includes("high demand") ||
+    msg.includes("overloaded") ||
+    msg.includes("spikes in demand") ||
+    msg.includes("rate limit") ||
+    msg.includes("quota") ||
+    msg.includes("deadline") ||
+    msg.includes("econnreset") ||
+    msg.includes("etimedout") ||
+    msg.includes("fetch failed") ||
+    msg.includes("timeout")
+  ) {
+    return true;
+  }
+
+  return false;
+}
 
 // ============================================
 // AUTHENTICATION MIDDLEWARE
@@ -19,7 +81,12 @@ const ai = new GoogleGenAI({
 
 const authenticateUser = (req, res, next) => {
   try {
-    const token = req.cookies?.token;
+    const authHeader = req.headers?.authorization;
+    const token =
+      req.cookies?.token ||
+      (authHeader && authHeader.startsWith("Bearer ")
+        ? authHeader.split(" ")[1]
+        : null);
 
     if (!token) {
       return res.status(401).json({
@@ -29,7 +96,7 @@ const authenticateUser = (req, res, next) => {
 
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET
+      process.env.JWT_SECRET || "lumiLex_super_secret_key_change_this"
     );
 
     req.user = decoded;
@@ -632,110 +699,85 @@ Generate the story now.
 `;
 
       // ==========================================
-      // GEMINI REQUEST
+      // STORY GENERATION WITH RETRY & FALLBACK
       // ==========================================
 
-      let response;
+      let storyContent = "";
+      let title = "";
+      let geminiSuccess = false;
 
-      try {
-        response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: prompt,
-          config: {
-            temperature: 0.8,
-            maxOutputTokens: 1200,
-          },
-        });
-      } catch (geminiError) {
-        console.error(
-          "Gemini generation error:",
-          geminiError
-        );
+      const MAX_GEMINI_RETRIES = 2; // Total of 3 attempts
+      let attempt = 0;
 
-        // ========================================
-        // RETRY FOR TEMPORARY SERVER/RATE ERRORS
-        // ========================================
+      while (attempt <= MAX_GEMINI_RETRIES && !geminiSuccess) {
+        attempt++;
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-3.8-flash",
+            contents: prompt,
+            config: {
+              temperature: 0.8,
+              maxOutputTokens: 1200,
+            },
+          });
 
-        const status =
-          geminiError?.status ||
-          geminiError?.response?.status;
+          const rawText = response?.text || "";
+          const cleaned = cleanGeneratedStory(rawText);
 
-        if (
-          status === 429 ||
-          status === 503 ||
-          status === 500
-        ) {
-          console.log(
-            "Retrying Gemini generation..."
-          );
+          if (cleaned && cleaned.length > 20) {
+            storyContent = cleaned;
+            geminiSuccess = true;
+            break;
+          } else {
+            throw new Error("Gemini returned empty or incomplete story content");
+          }
+        } catch (geminiError) {
+          safeLogError(`Gemini generation attempt ${attempt} failed`, geminiError);
 
-          await new Promise((resolve) =>
-            setTimeout(resolve, 2000)
-          );
+          const isTransient = isTransientError(geminiError);
 
-          response =
-            await ai.models.generateContent({
-              model: "gemini-3.8-flash",
-              contents: prompt,
-              config: {
-                temperature: 0.8,
-                maxOutputTokens: 1200,
-              },
-            });
-        } else {
-          throw geminiError;
+          // If error is permanent (400, 401, 403, 404) or retries exhausted, exit loop
+          if (!isTransient || attempt > MAX_GEMINI_RETRIES) {
+            break;
+          }
+
+          // Exponential backoff: 1000ms, then 2000ms (+ small jitter)
+          const backoffMs = Math.pow(2, attempt - 1) * 1000 + Math.floor(Math.random() * 200);
+          console.log(`Retrying Gemini generation in ${backoffMs}ms (attempt ${attempt}/${MAX_GEMINI_RETRIES})...`);
+          await new Promise((resolve) => setTimeout(resolve, backoffMs));
         }
       }
 
-      // ==========================================
-      // GET GENERATED TEXT
-      // ==========================================
-
-      let storyContent =
-        response?.text || "";
-
-      storyContent =
-        cleanGeneratedStory(storyContent);
-
-      if (!storyContent) {
-        return res.status(500).json({
-          error:
-            "The AI could not create a story. Please try again.",
+      // If Gemini did not succeed after retries (e.g. 503 high demand), use reliable fallback
+      if (!geminiSuccess || !storyContent) {
+        console.log("Using reliable child-friendly fallback story generator...");
+        const fallbackResult = await storyFallbackService.generateFallbackStory({
+          interests,
+          level,
+          length,
+          characterType,
+          characterName: safeCharacterName,
+          mood,
+          maxWords,
         });
+
+        storyContent = fallbackResult.storyContent;
+        title = fallbackResult.title;
       }
 
-      // ==========================================
-      // FINAL WORD LIMIT SAFETY CHECK
-      // ==========================================
+      // Clean & enforce word limit
+      storyContent = cleanGeneratedStory(storyContent);
+      storyContent = enforceWordLimit(storyContent, maxWords);
 
-      storyContent =
-        enforceWordLimit(
-          storyContent,
-          maxWords
-        );
-
-      // ==========================================
-      // CREATE TITLE
-      // ==========================================
-      //
-      // We generate a simple title separately
-      // rather than asking the story generator
-      // to include one in the story content.
-      //
-      // ==========================================
-
-      let title = "My Little Adventure";
-
-      try {
-        const titleResponse =
-          await ai.models.generateContent({
-            model: "gemini-3.8-flash",
-            contents: `
-Create ONE short, cute title for this
-children's story.
-
+      // Create title if not yet generated
+      if (!title) {
+        if (geminiSuccess) {
+          try {
+            const titleResponse = await ai.models.generateContent({
+              model: "gemini-3.8-flash",
+              contents: `
+Create ONE short, cute title for this children's story.
 The reader is 4–5 years old.
-
 Title rules:
 - 2–6 words
 - very easy words
@@ -746,35 +788,38 @@ Title rules:
 - no explanation
 
 Story:
-
 ${storyContent}
 
 Return ONLY the title.
 `,
-            config: {
-              temperature: 0.8,
-              maxOutputTokens: 30,
-            },
-          });
+              config: {
+                temperature: 0.8,
+                maxOutputTokens: 30,
+              },
+            });
 
-        const generatedTitle =
-          titleResponse?.text
-            ?.trim()
-            .replace(/^["']|["']$/g, "");
+            const generatedTitle = titleResponse?.text
+              ?.trim()
+              .replace(/^["']|["']$/g, "")
+              .replace(/[.!?]$/, "");
 
-        if (
-          generatedTitle &&
-          generatedTitle.length <= 80
-        ) {
-          title = generatedTitle;
+            if (generatedTitle && generatedTitle.length <= 80) {
+              title = generatedTitle;
+            }
+          } catch (titleError) {
+            safeLogError("Title generation notice", titleError);
+          }
         }
-      } catch (titleError) {
-        console.error(
-          "Title generation failed:",
-          titleError
-        );
 
-        // Keep default title if title generation fails.
+        // Guaranteed fallback title
+        if (!title) {
+          title = storyFallbackService.generateCuteTitle({
+            characterName: safeCharacterName,
+            characterType,
+            interest: interests[0] || "Adventure",
+            mood,
+          });
+        }
       }
 
       // ==========================================
@@ -1033,5 +1078,75 @@ router.get(
     }
   }
 );
+
+// ============================================
+// GENERATE STORY COMPREHENSION QUESTIONS
+// ============================================
+//
+// Generates 3-4 gentle, dyslexia-friendly comprehension
+// questions grounded in the story's actual text.
+// Library stories can be read by anyone logged in.
+// AI-generated stories can only be read by their owner.
+//
+// ============================================
+
+router.post(
+  "/:id/comprehension",
+  authenticateUser,
+  async (req, res) => {
+    try {
+      const storyId = req.params.id;
+
+      const result = await pool.query(
+        `
+        SELECT *
+        FROM stories
+        WHERE
+          id = $1
+          AND (
+            story_type = 'library'
+            OR user_id = $2
+          )
+        LIMIT 1
+        `,
+        [
+          storyId,
+          req.user.id,
+        ]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          error: "Story not found.",
+        });
+      }
+
+      const story = result.rows[0];
+
+      const questionsData = await comprehensionService.generateStoryQuestions({
+        storyId: story.id,
+        title: story.title,
+        content: story.content,
+        difficulty: story.difficulty,
+        topic: story.topic,
+      });
+
+      return res.json(questionsData);
+    } catch (error) {
+      console.error(
+        "Error generating comprehension questions:",
+        error
+      );
+
+      return res.status(500).json({
+        error: "Failed to generate comprehension questions.",
+      });
+    }
+  }
+);
+
+router._ai = ai;
+router._isTransientError = isTransientError;
+router._safeLogError = safeLogError;
 
 module.exports = router;

@@ -16,6 +16,7 @@ import {
   Target,
   ArrowRight,
   Flame,
+  HelpCircle,
 } from "lucide-react";
 import "./StoryReader.css";
 
@@ -28,88 +29,13 @@ import {
   getFriendlyVoice,
   speakText,
 } from "../utils/childAudio";
-import { analyzeStoryReadingErrors } from "../utils/storyErrorAnalyzer";
+import {
+  analyzeStoryReadingErrors,
+  isConfidentDyslexiaMatch,
+  normalizeWord,
+} from "../utils/storyErrorAnalyzer";
 import { submitStoryReadingCompletion } from "../utils/gemmaAdaptive";
 import LessonPlayerModal from "../components/LessonPlayerModal";
-
-// =========================================================
-// DYSLEXIA-FRIENDLY PHONETIC & LEVENSHTEIN MATCHER
-// Accommodates common dyslexia pronunciation stumbles,
-// letter transpositions (b <-> d, p <-> q, m <-> w),
-// and slight vowel shifts without frustrating the child.
-// =========================================================
-
-function levenshteinDistance(a, b) {
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
-  const matrix = [];
-  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      if (b.charAt(i - 1) === a.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1];
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1,
-          matrix[i][j - 1] + 1,
-          matrix[i - 1][j] + 1
-        );
-      }
-    }
-  }
-  return matrix[b.length][a.length];
-}
-
-function normalizeWord(word) {
-  if (!word) return "";
-  return word
-    .toLowerCase()
-    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035']/g, "") // smart single quotes/apostrophes
-    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036"]/g, "") // smart double quotes
-    .replace(/[\u2013\u2014\-–—]/g, "") // hyphens and dashes
-    .replace(/[.,!?;:()[\]{}…*~_`#/\\]/g, "") // punctuation
-    .trim();
-}
-
-function isDyslexiaMatch(spoken, expected) {
-  if (!spoken || !expected) return false;
-  const s = normalizeWord(spoken);
-  const e = normalizeWord(expected);
-  if (!s || !e) return false;
-  if (s === e) return true;
-
-  // 1. Common dyslexia letter transpositions check (b <-> d, p <-> q, m <-> w, n <-> u)
-  const normSpoken = s
-    .replace(/d/g, "b")
-    .replace(/q/g, "p")
-    .replace(/w/g, "m")
-    .replace(/u/g, "n");
-  const normExpected = e
-    .replace(/d/g, "b")
-    .replace(/q/g, "p")
-    .replace(/w/g, "m")
-    .replace(/u/g, "n");
-  if (normSpoken === normExpected) return true;
-
-  // 2. Inflection / Stemming match (running -> run, cats -> cat, jumped -> jump)
-  const stripEndings = (w) => w.replace(/(ing|tion|sion|ed|er|est|ly|es|s)$/i, "");
-  const stemS = stripEndings(s);
-  const stemE = stripEndings(e);
-  if (stemS && stemE && stemS === stemE) return true;
-
-  // 3. Levenshtein edit distance for minor pronunciation stumbles or accents
-  const dist = levenshteinDistance(s, e);
-  if (e.length <= 3 && dist <= 1) return true;
-  if (e.length > 3 && dist <= 2) return true;
-
-  // 4. Substring / compound prefix match
-  if (e.length >= 4 && (s.startsWith(e) || e.startsWith(s))) {
-    return true;
-  }
-
-  return false;
-}
 
 // Simple English syllable splitter for visual reading aid
 function splitSyllables(word) {
@@ -167,6 +93,7 @@ export default function StoryReader() {
 
   // Words that LumiLex has recognized
   const [readWordIndexes, setReadWordIndexes] = useState([]);
+  const [wordStatuses, setWordStatuses] = useState({});
 
   // Current word LumiLex expects
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
@@ -187,7 +114,16 @@ export default function StoryReader() {
   const [gemmaPracticeSession, setGemmaPracticeSession] = useState(null);
   const [isGemmaAnalyzing, setIsGemmaAnalyzing] = useState(false);
   const [activePracticeModal, setActivePracticeModal] = useState(null);
+  const [isSubmittingCompletion, setIsSubmittingCompletion] = useState(false);
   const accumulatedTranscriptRef = useRef("");
+  const isSubmittingRef = useRef(false);
+
+  // ==========================================
+  // STORY COMPREHENSION QUIZ
+  // ==========================================
+  const [isComprehensionLoading, setIsComprehensionLoading] = useState(false);
+  const [comprehensionError, setComprehensionError] = useState("");
+  const [cachedComprehension, setCachedComprehension] = useState(null);
 
   // ==========================================
   // REFS
@@ -195,10 +131,12 @@ export default function StoryReader() {
   const speechRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const speechRecognitionRef = useRef(null);
+  const speechRecognitionActiveRef = useRef(false);
   const listeningRef = useRef(false);
   const completionRef = useRef(false);
   const expectedWordIndexRef = useRef(0);
   const readWordIndexesRef = useRef(new Set());
+  const wordDetailsRef = useRef({});
   const justCaughtTimerRef = useRef(null);
   const pauseTimerRef = useRef(null);
   const recordingTimerRef = useRef(null);
@@ -288,7 +226,7 @@ export default function StoryReader() {
   };
 
   // ==========================================
-  // PROCESS SPOKEN TEXT (ACCURATE + DYSLEXIA MATCHER)
+  // PROCESS SPOKEN TEXT (RELIABLE WORD-BY-WORD MATCHER)
   // ==========================================
   const processSpokenText = (spokenText) => {
     if (!content || !spokenText) return;
@@ -320,51 +258,137 @@ export default function StoryReader() {
         continue;
       }
 
-      // Generous lookahead (up to 16 words) to tolerate pauses or skipped small articles
-      let matchedIndex = -1;
-      const LOOK_AHEAD = 16;
-      const searchEnd = Math.min(expectedIndex + LOOK_AHEAD, storyWords.length);
+      const currentExpected = storyWords[expectedIndex];
+      const expectedNorm = normalizeWord(currentExpected.word);
 
-      for (let i = expectedIndex; i < searchEnd; i++) {
-        const expectedWord = normalizeWord(storyWords[i].word);
-        if (isDyslexiaMatch(spokenWord, expectedWord)) {
-          matchedIndex = i;
+      // 1. CONFIDENT DIRECT MATCH with current expected word
+      if (isConfidentDyslexiaMatch(spokenWord, expectedNorm)) {
+        newlyCaught = true;
+        latestWord = currentExpected.word;
+        latestIndex = currentExpected.uniqueIndex;
+
+        readWordIndexesRef.current.add(currentExpected.uniqueIndex);
+        wordDetailsRef.current[currentExpected.uniqueIndex] = {
+          status: "correct",
+          spoken: spokenWord,
+          attempts: (wordDetailsRef.current[currentExpected.uniqueIndex]?.attempts || 0) + 1,
+        };
+
+        expectedIndex++;
+        continue;
+      }
+
+      // 2. SMALL STRICT LOOKAHEAD (1 or 2 words ahead max)
+      // If child skipped 1 or 2 words and read the next word, mark skipped words as "skipped"
+      // NEVER mark skipped words green!
+      let lookaheadMatchedIndex = -1;
+      const LOOK_AHEAD_MAX = 2;
+      const searchEnd = Math.min(expectedIndex + 1 + LOOK_AHEAD_MAX, storyWords.length);
+
+      for (let i = expectedIndex + 1; i < searchEnd; i++) {
+        const lookaheadNorm = normalizeWord(storyWords[i].word);
+        if (isConfidentDyslexiaMatch(spokenWord, lookaheadNorm)) {
+          lookaheadMatchedIndex = i;
           break;
         }
       }
 
-      // Word found
-      if (matchedIndex !== -1) {
+      if (lookaheadMatchedIndex !== -1) {
         newlyCaught = true;
-        latestWord = storyWords[matchedIndex].word;
-        latestIndex = storyWords[matchedIndex].uniqueIndex;
+        latestWord = storyWords[lookaheadMatchedIndex].word;
+        latestIndex = storyWords[lookaheadMatchedIndex].uniqueIndex;
 
-        // Contiguous forward progression: mark all words up to matchedIndex as read
-        for (let fillIdx = expectedIndex; fillIdx <= matchedIndex; fillIdx++) {
-          readWordIndexesRef.current.add(storyWords[fillIdx].uniqueIndex);
+        // Mark intermediate words as SKIPPED — NOT GREEN
+        for (let skipIdx = expectedIndex; skipIdx < lookaheadMatchedIndex; skipIdx++) {
+          const skippedUnique = storyWords[skipIdx].uniqueIndex;
+          readWordIndexesRef.current.delete(skippedUnique);
+          const prevStatus = wordDetailsRef.current[skippedUnique]?.status;
+          if (prevStatus !== "correct" && prevStatus !== "misread") {
+            wordDetailsRef.current[skippedUnique] = {
+              status: "skipped",
+              spoken: "",
+              attempts: wordDetailsRef.current[skippedUnique]?.attempts || 0,
+            };
+          }
         }
 
-        expectedIndex = matchedIndex + 1;
-        expectedWordIndexRef.current = expectedIndex;
-        setCurrentWordIndex(expectedIndex);
+        // Mark the matched word as CORRECT
+        readWordIndexesRef.current.add(storyWords[lookaheadMatchedIndex].uniqueIndex);
+        wordDetailsRef.current[storyWords[lookaheadMatchedIndex].uniqueIndex] = {
+          status: "correct",
+          spoken: spokenWord,
+          attempts: (wordDetailsRef.current[storyWords[lookaheadMatchedIndex].uniqueIndex]?.attempts || 0) + 1,
+        };
 
-        setReadingProgress(
-          Math.round((expectedIndex / storyWords.length) * 100)
-        );
+        expectedIndex = lookaheadMatchedIndex + 1;
+        continue;
+      }
 
-        // Story finished!
-        if (expectedIndex >= storyWords.length) {
-          expectedWordIndexRef.current = expectedIndex;
-          setReadWordIndexes(Array.from(readWordIndexesRef.current));
-          setReadingProgress(100);
-          completeStory();
-          return;
+      // 3. LOOKBACK FOR SELF-CORRECTION (up to 2 words back)
+      // If child backs up and says a previously skipped or misread word, upgrade to correct!
+      let lookbackMatchedIndex = -1;
+      const searchStart = Math.max(0, expectedIndex - 2);
+      for (let i = expectedIndex - 1; i >= searchStart; i--) {
+        const prevUnique = storyWords[i].uniqueIndex;
+        const prevStatus = wordDetailsRef.current[prevUnique]?.status;
+        if (prevStatus === "skipped" || prevStatus === "misread") {
+          if (isConfidentDyslexiaMatch(spokenWord, normalizeWord(storyWords[i].word))) {
+            lookbackMatchedIndex = i;
+            break;
+          }
         }
+      }
+
+      if (lookbackMatchedIndex !== -1) {
+        newlyCaught = true;
+        latestWord = storyWords[lookbackMatchedIndex].word;
+        latestIndex = storyWords[lookbackMatchedIndex].uniqueIndex;
+
+        readWordIndexesRef.current.add(latestIndex);
+        wordDetailsRef.current[latestIndex] = {
+          status: "correct",
+          spoken: spokenWord,
+          attempts: (wordDetailsRef.current[latestIndex]?.attempts || 0) + 1,
+        };
+        continue;
+      }
+
+      // 4. NO MATCH: Potential misread attempt on the current word
+      const currUnique = currentExpected.uniqueIndex;
+      const prevAttempts = wordDetailsRef.current[currUnique]?.attempts || 0;
+      if (wordDetailsRef.current[currUnique]?.status !== "correct") {
+        readWordIndexesRef.current.delete(currUnique);
+        wordDetailsRef.current[currUnique] = {
+          status: "misread",
+          spoken: spokenWord,
+          attempts: prevAttempts + 1,
+        };
+        newlyCaught = true;
       }
     }
 
+    expectedWordIndexRef.current = expectedIndex;
+    setCurrentWordIndex(expectedIndex);
+
+    // Sync state maps
+    const newStatuses = {};
+    const correctList = [];
+    Object.keys(wordDetailsRef.current).forEach((key) => {
+      const st = wordDetailsRef.current[key]?.status;
+      newStatuses[key] = st;
+      if (st === "correct") correctList.push(key);
+    });
+
+    setWordStatuses(newStatuses);
+    setReadWordIndexes(correctList);
+
+    const progress = Math.min(
+      100,
+      Math.round((correctList.length / storyWords.length) * 100)
+    );
+    setReadingProgress(progress);
+
     if (newlyCaught) {
-      setReadWordIndexes(Array.from(readWordIndexesRef.current));
       if (latestWord) {
         setLastCaughtWord(latestWord);
       }
@@ -376,12 +400,22 @@ export default function StoryReader() {
         }, 1200);
       }
     }
+
+    // Only complete if ALL words have been reached and attempted
+    if (expectedIndex >= storyWords.length) {
+      completeStory();
+    }
   };
 
   // ==========================================
   // SEND AUDIO TO ACCURATE WHISPER SERVICE
   // ==========================================
   const sendAudioToWhisper = async (audioBlob) => {
+    // If WebSpeech is actively streaming, Whisper does not duplicate recognition
+    if (speechRecognitionActiveRef.current) {
+      return;
+    }
+
     try {
       setIsWhisperProcessing(true);
       const formData = new FormData();
@@ -452,6 +486,8 @@ export default function StoryReader() {
 
       readWordIndexesRef.current = new Set();
       setReadWordIndexes([]);
+      setWordStatuses({});
+      wordDetailsRef.current = {};
       setCurrentWordIndex(0);
       setReadingProgress(0);
       setHeardTranscript("");
@@ -469,10 +505,11 @@ export default function StoryReader() {
         try {
           const recognition = new SpeechRecognition();
           recognition.continuous = true;
-          recognition.interimResults = true;
+          recognition.interimResults = false;
           recognition.lang = "en-US";
 
           recognition.onresult = (event) => {
+            speechRecognitionActiveRef.current = true;
             let transcriptChunk = "";
             for (let i = event.resultIndex; i < event.results.length; i++) {
               if (event.results[i].isFinal) {
@@ -482,18 +519,23 @@ export default function StoryReader() {
             if (transcriptChunk.trim()) {
               setPauseMessage("");
               startPauseTimer();
+              accumulatedTranscriptRef.current = (
+                accumulatedTranscriptRef.current + " " + transcriptChunk.trim()
+              ).trim();
               processSpokenText(transcriptChunk);
             }
           };
 
           recognition.onerror = (err) => {
             console.log("Speech recognition notification:", err);
+            speechRecognitionActiveRef.current = false;
           };
 
           recognition.start();
           speechRecognitionRef.current = recognition;
         } catch (e) {
           console.log("Browser recognition fallback active.");
+          speechRecognitionActiveRef.current = false;
         }
       }
 
@@ -570,6 +612,7 @@ export default function StoryReader() {
 
   const stopAllListening = () => {
     listeningRef.current = false;
+    speechRecognitionActiveRef.current = false;
     setIsListening(false);
     setIsWhisperProcessing(false);
     clearPauseTimer();
@@ -709,6 +752,24 @@ export default function StoryReader() {
   // ==========================================
   // COMPLETE STORY & GEMMA ERROR ANALYSIS
   // ==========================================
+  const handleContinueReading = async () => {
+    if (isSubmittingRef.current || completionRef.current) return;
+    isSubmittingRef.current = true;
+    setIsSubmittingCompletion(true);
+
+    // Safely stop microphone and speech synthesis
+    stopAllListening();
+    window.speechSynthesis.cancel();
+    setIsReading(false);
+    setActiveWord(null);
+    setPauseMessage("");
+
+    // Small delay to let final audio chunk buffer settle safely
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    await completeStory(true);
+  };
+
   const completeStory = async (forceFinish = false) => {
     if (completionRef.current) return;
 
@@ -721,58 +782,154 @@ export default function StoryReader() {
     setIsReading(false);
     setActiveWord(null);
     setPauseMessage("");
-    setReadingProgress(100);
 
-    // 1. Analyze reading errors (substitutions, mispronunciations, omissions)
+    // 1. Analyze reading results (sequential alignment + live status map)
     const analysis = analyzeStoryReadingErrors({
       storyWords,
       spokenTranscript: accumulatedTranscriptRef.current,
+      wordStatusMap: wordDetailsRef.current,
       readWordIndexes: Array.from(readWordIndexesRef.current),
     });
     setReadingAnalysis(analysis);
 
-    recordStoryCompletion(userId);
-    setStarsEarned(3);
-    playSuccessChime();
+    const starsAwarded =
+      typeof analysis.starsAwarded === "number" ? analysis.starsAwarded : 0;
+    setStarsEarned(starsAwarded);
+
+    // Record rewards using existing reward system
+    recordStoryCompletion(userId, starsAwarded);
+    if (starsAwarded > 0) {
+      playSuccessChime();
+    }
+
     setShowCompletion(true);
+    setIsSubmittingCompletion(false);
 
-    // 2. Request Gemma Cloud to generate personalized practice session targeting caught errors
-    setIsGemmaAnalyzing(true);
-    try {
-      const gemmaRes = await submitStoryReadingCompletion({
-        storyId: id,
-        storyTitle: content?.title || "Story Adventure",
-        storyTopic: content?.topic || "General",
-        accuracy: analysis.accuracy,
-        wordsRead: analysis.wordsReadCount,
-        totalWords: analysis.totalWords,
-        speechTranscript: accumulatedTranscriptRef.current,
-        expectedText: content?.paragraphs?.join(" ") || "",
-        errors: analysis.errors,
-        trickyWords: analysis.trickyWords,
-        userId,
-      });
+    // 2. Request Gemma Cloud only if tricky words exist. Flawless reading needs no extra practice!
+    if (analysis.trickyWords && analysis.trickyWords.length > 0) {
+      setIsGemmaAnalyzing(true);
+      try {
+        const gemmaRes = await submitStoryReadingCompletion({
+          storyId: id,
+          storyTitle: content?.title || "Story Adventure",
+          storyTopic: content?.topic || "General",
+          readingLevel: content?.difficulty || "Beginner",
+          accuracy: analysis.accuracy,
+          wordsRead: analysis.wordsReadCount,
+          totalWords: analysis.totalWords,
+          speechTranscript: accumulatedTranscriptRef.current,
+          expectedText: content?.paragraphs?.join(" ") || "",
+          errors: analysis.errors,
+          trickyWords: analysis.trickyWords,
+          correctWords: analysis.correctWords,
+          incorrectWords: analysis.incorrectWords,
+          skippedWords: analysis.skippedWords,
+          unreadWords: analysis.unreadWords,
+          isReliable: analysis.isReliable,
+          userId,
+        });
 
-      if (gemmaRes && gemmaRes.gemmaPractice) {
-        setGemmaPracticeSession(gemmaRes.gemmaPractice);
+        if (gemmaRes && gemmaRes.gemmaPractice) {
+          setGemmaPracticeSession(gemmaRes.gemmaPractice);
+        }
+      } catch (err) {
+        console.warn("Gemma story practice fetch error:", err);
+      } finally {
+        setIsGemmaAnalyzing(false);
       }
-    } catch (err) {
-      console.warn("Gemma story practice fetch error:", err);
-    } finally {
+    } else {
+      setGemmaPracticeSession(null);
       setIsGemmaAnalyzing(false);
     }
   };
 
+  // ==========================================
+  // LAUNCH COMPREHENSION QUIZ
+  // ==========================================
+  const handleStartComprehensionQuiz = async () => {
+    playTapSound();
+    setComprehensionError("");
+
+    if (cachedComprehension && cachedComprehension.length > 0) {
+      setActivePracticeModal({
+        lesson: {
+          id: `story-comp-${id}`,
+          title: `Quiz: ${content?.title || "Story Adventure"}`,
+          subtitle: "Story Comprehension",
+          icon: "🧩",
+          xp: 25,
+          gemsReward: 10,
+        },
+        unit: {
+          id: 6,
+          unitNumber: 1,
+          title: content?.title || "Story Adventure",
+          icon: "📖",
+        },
+        questions: cachedComprehension,
+      });
+      return;
+    }
+
+    setIsComprehensionLoading(true);
+    try {
+      const response = await fetch(`http://localhost:5000/api/stories/${id}/comprehension`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Could not load comprehension questions.");
+      }
+
+      const data = await response.json();
+      if (!data.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
+        throw new Error("No comprehension questions available for this story.");
+      }
+
+      setCachedComprehension(data.questions);
+
+      setActivePracticeModal({
+        lesson: {
+          id: `story-comp-${id}`,
+          title: `Quiz: ${content?.title || "Story Adventure"}`,
+          subtitle: "Story Comprehension",
+          icon: "🧩",
+          xp: 25,
+          gemsReward: 10,
+        },
+        unit: {
+          id: 6,
+          unitNumber: 1,
+          title: content?.title || "Story Adventure",
+          icon: "📖",
+        },
+        questions: data.questions,
+      });
+    } catch (err) {
+      console.warn("Comprehension quiz fetch error:", err);
+      setComprehensionError("Unable to load comprehension questions right now. Please try again!");
+    } finally {
+      setIsComprehensionLoading(false);
+    }
+  };
+
   const startReading = () => {
+    isSubmittingRef.current = false;
+    setIsSubmittingCompletion(false);
     setHasStartedReading(true);
     setReadingProgress(0);
     setReadWordIndexes([]);
+    setWordStatuses({});
+    wordDetailsRef.current = {};
     setCurrentWordIndex(0);
     expectedWordIndexRef.current = 0;
     completionRef.current = false;
     setShowCompletion(false);
     setReadingAnalysis(null);
     setGemmaPracticeSession(null);
+    setComprehensionError("");
     accumulatedTranscriptRef.current = "";
 
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -821,24 +978,55 @@ export default function StoryReader() {
     return (
       <div className="completion-screen">
         <div className="completion-card gemma-story-completion-card">
-          <div className="completion-icon">🎉</div>
-          <h1>Splendid Reading, {childName}!</h1>
-          <h2>You explored the whole story!</h2>
+          <div className="completion-icon">
+            {starsEarned >= 2 ? "🎉" : starsEarned === 1 ? "🌟" : "🌱"}
+          </div>
+          <h1>
+            {starsEarned === 3
+              ? `Superstar Reading, ${childName}!`
+              : starsEarned >= 1
+              ? `Great Effort, ${childName}!`
+              : `Nice Try, ${childName}!`}
+          </h1>
+          <h2>
+            {starsEarned >= 2
+              ? "You explored the story brilliantly!"
+              : "Every word you read helps you grow stronger!"}
+          </h2>
           <p className="completion-story-title">{content.title}</p>
 
-          <div className="completion-stars">⭐ ⭐ ⭐</div>
-          <div className="stars-reward">+3 Stars • +15 Garden Points 🌿</div>
+          {/* Dynamic Stars Based on Accuracy */}
+          <div className="completion-stars" aria-label={`${starsEarned} out of 3 stars`}>
+            {starsEarned === 3 && <>⭐ ⭐ ⭐</>}
+            {starsEarned === 2 && <>⭐ ⭐ <span className="star-faded">☆</span></>}
+            {starsEarned === 1 && <>⭐ <span className="star-faded">☆ ☆</span></>}
+            {starsEarned === 0 && <><span className="star-faded">☆ ☆ ☆</span></>}
+          </div>
+
+          <div className="stars-reward">
+            {starsEarned > 0 ? (
+              `+${starsEarned} Reading Star${starsEarned > 1 ? "s" : ""} • +15 Garden Points 🌿`
+            ) : (
+              "Keep practicing! Every word makes you a better reader 🌱"
+            )}
+          </div>
 
           {/* Reading Metrics Grid */}
           {readingAnalysis && (
             <div className="story-metrics-grid">
               <div className="story-metric-stat">
-                <span className="metric-num">{readingAnalysis.accuracy}%</span>
-                <span className="metric-label">Accuracy</span>
+                <span className="metric-num">
+                  {readingAnalysis.isReliable && readingAnalysis.accuracy !== null
+                    ? `${readingAnalysis.accuracy}%`
+                    : "Voice Check"}
+                </span>
+                <span className="metric-label">
+                  {readingAnalysis.isReliable ? "Accuracy" : "Status"}
+                </span>
               </div>
               <div className="story-metric-stat">
                 <span className="metric-num">
-                  {readingAnalysis.wordsReadCount} / {readingAnalysis.totalWords}
+                  {readingAnalysis.wordsReadCount} / {readingAnalysis.assessedWordsCount || readingAnalysis.totalWords}
                 </span>
                 <span className="metric-label">Words Caught</span>
               </div>
@@ -849,8 +1037,50 @@ export default function StoryReader() {
             </div>
           )}
 
-          {/* Tricky Words Caught Pills */}
-          {readingAnalysis && readingAnalysis.trickyWords?.length > 0 && (
+          {/* Microphone Reliability Note if Speech was Incomplete or Empty */}
+          {readingAnalysis && !readingAnalysis.isReliable && (
+            <div className="unreliable-voice-box">
+              <div className="unreliable-voice-header">
+                <Volume2 size={20} color="#059669" />
+                <strong>Microphone Note</strong>
+              </div>
+              <p>
+                We couldn't catch enough clear speech this time. That is completely okay!
+                Microphones can be tricky. You can practice words below or tap <strong>Read Story Again</strong> with your microphone! 🎙️
+              </p>
+            </div>
+          )}
+
+          {/* Unassessed Words Note if Child Pressed Continue Early */}
+          {readingAnalysis && readingAnalysis.unassessedWords?.length > 0 && (
+            <p className="unassessed-words-note">
+              🌱 <em>Note: {readingAnalysis.unassessedWords.length} words later in the story were left unread and were not counted against your score.</em>
+            </p>
+          )}
+
+          {/* Words Read Correctly Pills */}
+          {readingAnalysis && readingAnalysis.correctWords?.length > 0 && (
+            <div className="story-correct-box">
+              <div className="story-correct-title">
+                <span>✨ Words Read Correctly ({readingAnalysis.correctWords.length}):</span>
+              </div>
+              <div className="story-correct-chips">
+                {readingAnalysis.correctWords.slice(0, 16).map((word, idx) => (
+                  <span key={idx} className="correct-word-pill">
+                    ✓ {word}
+                  </span>
+                ))}
+                {readingAnalysis.correctWords.length > 16 && (
+                  <span className="more-words-badge">
+                    +{readingAnalysis.correctWords.length - 16} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tricky Words Caught Pills or Flawless Celebration Card */}
+          {readingAnalysis && readingAnalysis.trickyWords?.length > 0 ? (
             <div className="story-tricky-box">
               <div className="story-tricky-title">
                 <span>🔍 Words Caught for Gentle Practice:</span>
@@ -870,6 +1100,14 @@ export default function StoryReader() {
                 ))}
               </div>
             </div>
+          ) : (
+            <div className="celebration-perfect-card">
+              <div className="celebration-icon">🌟</div>
+              <h3>Fantastic Reading!</h3>
+              <p>
+                You read every assessed word like a reading champion! No extra practice needed today!
+              </p>
+            </div>
           )}
 
           {/* Substituted Words Detail (Whisper Comparison) */}
@@ -887,66 +1125,105 @@ export default function StoryReader() {
             </div>
           )}
 
-          {/* Gemma AI Story Reading Coach Card */}
-          <div className="gemma-story-coach-container">
-            <div className="gemma-coach-card-header">
-              <div className="gemma-badge-icon">
-                <Brain size={18} color="#7c3aed" />
+          {/* Gemma AI Story Reading Coach Card - Only if tricky words exist or while analyzing */}
+          {readingAnalysis && (readingAnalysis.trickyWords?.length > 0 || isGemmaAnalyzing) && (
+            <div className="gemma-story-coach-container">
+              <div className="gemma-coach-card-header">
+                <div className="gemma-badge-icon">
+                  <Brain size={18} color="#7c3aed" />
+                </div>
+                <div>
+                  <strong>Gemma AI Reading Coach</strong>
+                  <p>Personalized from your reading of this story</p>
+                </div>
+              </div>
+
+              {isGemmaAnalyzing ? (
+                <div className="gemma-loading-state">
+                  <div className="gemma-pulse-ring"></div>
+                  <p>
+                    Gemma Cloud is analyzing your reading stumbles and crafting your custom practice session... 🧠✨
+                  </p>
+                </div>
+              ) : gemmaPracticeSession ? (
+                <div className="gemma-coach-content">
+                  <p className="gemma-feedback-bubble">
+                    {gemmaPracticeSession.coachFeedback ||
+                      "Awesome job reading out loud! Practice these tricky words to make your reading fluency shine."}
+                  </p>
+                  {gemmaPracticeSession.errorAnalysis && (
+                    <p className="gemma-phonics-note">
+                      💡 <strong>Coach Tip:</strong> {gemmaPracticeSession.errorAnalysis}
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    className="gemma-launch-practice-btn"
+                    onClick={() => {
+                      playTapSound();
+                      setActivePracticeModal({
+                        lesson: {
+                          id: `story-practice-${id}`,
+                          title: `Story Practice: ${content.title}`,
+                          subtitle: "Crafted by Gemma AI",
+                          icon: "📖",
+                          xp: 20,
+                          gemsReward: 8,
+                        },
+                        unit: {
+                          id: 1,
+                          unitNumber: 1,
+                          title: content.title,
+                          icon: "📖",
+                        },
+                        questions: gemmaPracticeSession.practiceQuestions || [],
+                      });
+                    }}
+                  >
+                    <Sparkles size={18} />
+                    <span>Start Gemma Practice Session (5 Questions) 🎯</span>
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {/* Story Comprehension Quiz Card */}
+          <div className="story-comprehension-container">
+            <div className="comprehension-card-header">
+              <div className="comprehension-badge-icon">
+                <HelpCircle size={18} color="#059669" />
               </div>
               <div>
-                <strong>Gemma AI Reading Coach</strong>
-                <p>Personalized from your reading of this story</p>
+                <strong>Story Comprehension Quiz</strong>
+                <p>Gentle 3–4 questions about what happened in this story 🌱</p>
               </div>
             </div>
 
-            {isGemmaAnalyzing ? (
-              <div className="gemma-loading-state">
-                <div className="gemma-pulse-ring"></div>
-                <p>
-                  Gemma Cloud is analyzing your reading stumbles and crafting your custom practice session... 🧠✨
-                </p>
-              </div>
-            ) : gemmaPracticeSession ? (
-              <div className="gemma-coach-content">
-                <p className="gemma-feedback-bubble">
-                  {gemmaPracticeSession.coachFeedback ||
-                    "Awesome job reading out loud! Practice these tricky words to make your reading fluency shine."}
-                </p>
-                {gemmaPracticeSession.errorAnalysis && (
-                  <p className="gemma-phonics-note">
-                    💡 <strong>Coach Tip:</strong> {gemmaPracticeSession.errorAnalysis}
-                  </p>
-                )}
+            <div className="comprehension-card-body">
+              <p className="comprehension-feedback-bubble">
+                Check your understanding of <strong>"{content.title}"</strong>! Tap each choice to hear it out loud with friendly speech.
+              </p>
 
-                <button
-                  type="button"
-                  className="gemma-launch-practice-btn"
-                  onClick={() => {
-                    playTapSound();
-                    setActivePracticeModal({
-                      lesson: {
-                        id: `story-practice-${id}`,
-                        title: `Story Practice: ${content.title}`,
-                        subtitle: "Crafted by Gemma AI",
-                        icon: "📖",
-                        xp: 20,
-                        gemsReward: 8,
-                      },
-                      unit: {
-                        id: 1,
-                        unitNumber: 1,
-                        title: content.title,
-                        icon: "📖",
-                      },
-                      questions: gemmaPracticeSession.practiceQuestions || [],
-                    });
-                  }}
-                >
-                  <Sparkles size={18} />
-                  <span>Start Gemma Practice Session (5 Questions) 🎯</span>
-                </button>
-              </div>
-            ) : null}
+              {comprehensionError && (
+                <p className="comprehension-error-note">⚠️ {comprehensionError}</p>
+              )}
+
+              <button
+                type="button"
+                className="comprehension-launch-btn"
+                onClick={handleStartComprehensionQuiz}
+                disabled={isComprehensionLoading}
+              >
+                <Sparkles size={18} />
+                <span>
+                  {isComprehensionLoading
+                    ? "Preparing questions... ⏳"
+                    : "Start Comprehension Quiz (3-4 Questions) 🧩"}
+                </span>
+              </button>
+            </div>
           </div>
 
           <div className="completion-buttons">
@@ -1109,12 +1386,24 @@ export default function StoryReader() {
 
           <button
             type="button"
+            className="comprehension-quick-btn"
+            onClick={handleStartComprehensionQuiz}
+            disabled={isComprehensionLoading}
+            title="Check your story comprehension"
+          >
+            <HelpCircle size={16} />
+            <span>Story Quiz 🧩</span>
+          </button>
+
+          <button
+            type="button"
             className="finish-reading-btn"
-            onClick={completeStory}
+            onClick={handleContinueReading}
+            disabled={isSubmittingCompletion}
             title="Finish reading and analyze with Gemma AI"
           >
             <Sparkles size={16} />
-            <span>Finish & Analyze 🌟</span>
+            <span>{isSubmittingCompletion ? "Analyzing... ⏳" : "Continue 🌟"}</span>
           </button>
         </div>
 
@@ -1185,7 +1474,10 @@ export default function StoryReader() {
               >
                 {words.map((word, wordIndex) => {
                   const uniqueIndex = `${paragraphIndex}-${wordIndex}`;
-                  const isRead = readWordIndexes.includes(uniqueIndex);
+                  const status = wordStatuses[uniqueIndex] || (readWordIndexes.includes(uniqueIndex) ? "correct" : "unconfirmed");
+                  const isCorrect = status === "correct";
+                  const isSkipped = status === "skipped";
+                  const isMisread = status === "misread";
                   const isJustCaught = justCaughtIndex === uniqueIndex;
                   const isCurrent =
                     currentWordIndex ===
@@ -1194,7 +1486,10 @@ export default function StoryReader() {
                     );
 
                   let wordClass = "story-word";
-                  if (isRead) wordClass += " read";
+                  if (isCorrect) wordClass += " correct read";
+                  else if (isSkipped) wordClass += " skipped";
+                  else if (isMisread) wordClass += " misread";
+
                   if (isJustCaught) wordClass += " just-caught";
                   if (isCurrent && isListening) wordClass += " current";
                   if (activeWord === uniqueIndex) wordClass += " active";
@@ -1203,12 +1498,17 @@ export default function StoryReader() {
                     ? splitSyllables(word)
                     : word;
 
+                  let titleText = "Tap to hear this word";
+                  if (isCorrect) titleText = "Read correctly! 🌟 Tap to hear";
+                  else if (isSkipped) titleText = "Skipped word. Tap to hear";
+                  else if (isMisread) titleText = "Tricky word. Tap to hear";
+
                   return (
                     <span
                       key={uniqueIndex}
                       className={wordClass}
                       onClick={() => speakWord(word, uniqueIndex)}
-                      title="Tap to hear this word"
+                      title={titleText}
                     >
                       {displayWord}{" "}
                     </span>
@@ -1219,12 +1519,41 @@ export default function StoryReader() {
           })}
         </article>
 
+        {/* CHILD-FRIENDLY CONTINUE BUTTON BELOW STORY */}
+        <div className="story-continue-section">
+          <button
+            type="button"
+            className="story-continue-action-btn"
+            onClick={handleContinueReading}
+            disabled={isSubmittingCompletion}
+            aria-label="Continue and see how you did"
+          >
+            {isSubmittingCompletion ? (
+              <>
+                <span className="continue-pulse-spinner" />
+                <span>Let's see how you did! ✨</span>
+              </>
+            ) : (
+              <>
+                <span>Continue</span>
+                <ArrowRight size={22} className="continue-arrow-icon" />
+              </>
+            )}
+          </button>
+          <p className="continue-hint-text">
+            Read at your own pace! Click <strong>Continue</strong> whenever you are ready to see your stars. 🌟
+          </p>
+        </div>
+
         {/* FOOTER HELPER */}
         <div className="reading-companion-footer">
           {isListening ? (
             <>
-              <span>🌱</span>
-              <p>LumiLex is following along with your voice. No rush!</p>
+              <div className="reading-legend-pill">
+                <span className="legend-item"><span className="legend-dot green"></span> Read Correctly</span>
+                <span className="legend-item"><span className="legend-line orange"></span> Skipped / Tricky</span>
+              </div>
+              <p>LumiLex is following along with your voice. No rush! 🌱</p>
             </>
           ) : (
             <>

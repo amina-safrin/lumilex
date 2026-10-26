@@ -37,6 +37,10 @@ CREATE TABLE IF NOT EXISTS stories (
     character_name VARCHAR(100),
     mood VARCHAR(50),
     story_length VARCHAR(50),
+    phonics_focus VARCHAR(255),
+    practice_words TEXT[] DEFAULT '{}',
+    word_count INTEGER,
+    learning_objective TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -147,6 +147,13 @@ export async function submitStoryReadingCompletion({
   expectedText = "",
   errors = [],
   trickyWords = [],
+  readingLevel = "Beginner",
+  correctWords = [],
+  incorrectWords = [],
+  skippedWords = [],
+  unreadWords = [],
+  attempts = [],
+  isReliable = true,
   userId = null,
 }) {
   try {
@@ -165,6 +172,13 @@ export async function submitStoryReadingCompletion({
         expectedText,
         errors,
         trickyWords,
+        readingLevel,
+        correctWords,
+        incorrectWords,
+        skippedWords,
+        unreadWords,
+        attempts,
+        isReliable,
       }),
     });
 

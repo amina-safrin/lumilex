@@ -762,9 +762,10 @@ function addBadge(state, id, title, description, icon) {
   }
 }
 
-export function recordStoryCompletion(userId = null) {
+export function recordStoryCompletion(userId = null, starsEarned = 3) {
   const state = getLearningState(userId);
-  state.stars += 3;
+  const starsToAdd = Math.max(0, Number(starsEarned) || 0);
+  state.stars += starsToAdd;
   state.completedStories += 1;
   state.gardenPoints += 1;
   addBadge(state, "first-story", "Story Starter", "Finished your first reading adventure", "📖");

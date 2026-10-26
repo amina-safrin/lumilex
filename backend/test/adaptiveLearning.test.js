@@ -378,7 +378,7 @@ async function runTestSuite() {
       assert.ok(storyRes.data.success);
       assert.ok(storyRes.data.gemmaPractice);
       assert.strictEqual(storyRes.data.gemmaPractice.practiceQuestions.length, 5);
-      assert.strictEqual(storyRes.data.starsAwarded, 3);
+      assert.strictEqual(storyRes.data.starsAwarded, 1, "70% accuracy falls in 65-75% tier and correctly awards 1 star");
     }),
 
     test("Story Isolation: Account story sessions & tricky words remain strictly isolated between users", async () => {

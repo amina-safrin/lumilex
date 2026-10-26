@@ -1312,8 +1312,9 @@
     transform 0.18s ease;
 }
 
-/* Words LumiLex has already heard */
-.story-word.read {
+/* Words LumiLex has confirmed read correctly */
+.story-word.read,
+.story-word.correct {
   color: #14532d !important;
   background: #dcfce7 !important;
   font-weight: 700 !important;
@@ -1322,6 +1323,34 @@
   margin: 0 1px;
   box-shadow: 0 1px 3px rgba(22, 101, 52, 0.14);
   display: inline-block;
+}
+
+/* Words skipped by child — soft orange dotted underline (child-friendly & not intimidating) */
+.story-word.skipped {
+  color: #9a3412 !important;
+  background: transparent !important;
+  text-decoration: underline dotted #f97316 2.5px !important;
+  text-underline-offset: 4px;
+  font-weight: 600 !important;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: 0 1px;
+  display: inline-block;
+  transition: all 0.2s ease;
+}
+
+/* Words misread or pronunciation stumbled — gentle warm dashed underline */
+.story-word.misread {
+  color: #c2410c !important;
+  background: #fff7ed !important;
+  text-decoration: underline dashed #ea580c 2px !important;
+  text-underline-offset: 4px;
+  font-weight: 600 !important;
+  border-radius: 4px;
+  padding: 2px 5px;
+  margin: 0 1px;
+  display: inline-block;
+  transition: all 0.2s ease;
 }
 
 .story-word.just-caught {
@@ -2289,4 +2318,333 @@
 .completion-back-button:hover {
   background: #cbd5e1;
   transform: translateY(-1px);
-}
+}
+
+/* =========================================================
+   STORY COMPREHENSION QUIZ CARD & BUTTONS
+   ========================================================= */
+
+.comprehension-quick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1.5px solid #a7f3d0;
+  border-radius: 14px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.comprehension-quick-btn:hover:not(:disabled) {
+  background: #d1fae5;
+  border-color: #34d399;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.comprehension-quick-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.story-comprehension-container {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+  border: 2px solid #a7f3d0;
+  border-radius: 22px;
+  padding: 20px;
+  margin: 18px 0;
+  text-align: left;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.08);
+}
+
+.comprehension-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.comprehension-badge-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #d1fae5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.comprehension-card-header strong {
+  font-size: 16px;
+  color: #065f46;
+  display: block;
+}
+
+.comprehension-card-header p {
+  font-size: 12px;
+  color: #047857;
+  margin: 0;
+}
+
+.comprehension-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.comprehension-feedback-bubble {
+  background: #ffffff;
+  border: 1px solid #d1fae5;
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-size: 13.5px;
+  color: #064e3b;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.comprehension-error-note {
+  font-size: 12.5px;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 8px 12px;
+  border-radius: 10px;
+  margin: 0;
+}
+
+.comprehension-launch-btn {
+  margin-top: 6px;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 16px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 6px 18px rgba(5, 150, 105, 0.3);
+}
+
+.comprehension-launch-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(5, 150, 105, 0.4);
+}
+
+.comprehension-launch-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.comprehension-launch-btn:active {
+  transform: translateY(0);
+}
+
+/* =========================================================
+   CHILD-FRIENDLY CONTINUE BUTTON BELOW STORY
+   ========================================================= */
+
+.story-continue-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 32px auto 20px;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+}
+
+.story-continue-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 380px;
+  padding: 16px 32px;
+  background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 20px;
+  font-family: inherit;
+  font-size: 19px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(46, 125, 50, 0.35);
+  transition: all 0.22s ease-in-out;
+}
+
+.story-continue-action-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #388e3c 0%, #2e7d32 100%);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 28px rgba(46, 125, 50, 0.45);
+}
+
+.story-continue-action-btn:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.continue-arrow-icon {
+  transition: transform 0.2s ease;
+}
+
+.story-continue-action-btn:hover:not(:disabled) .continue-arrow-icon {
+  transform: translateX(4px);
+}
+
+.continue-pulse-spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: continue-spin 0.8s linear infinite;
+}
+
+@keyframes continue-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.continue-hint-text {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #55725d;
+  line-height: 1.5;
+}
+
+/* =========================================================
+   READING RESULTS & ACCURACY STARS
+   ========================================================= */
+
+.star-faded {
+  opacity: 0.28;
+  color: #94a3b8;
+  filter: grayscale(1);
+}
+
+.unreliable-voice-box {
+  background: #f0fdf4;
+  border: 1.5px dashed #86efac;
+  border-radius: 18px;
+  padding: 16px 20px;
+  margin: 16px 0;
+  text-align: left;
+}
+
+.unreliable-voice-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #166534;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.unreliable-voice-box p {
+  color: #14532d;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.unassessed-words-note {
+  font-size: 13px;
+  color: #4b6354;
+  margin: 8px 0 14px;
+  text-align: center;
+}
+
+/* Correct Words read pills */
+.story-correct-box {
+  background: #f4fbf5;
+  border: 1px solid #cce8d2;
+  border-radius: 18px;
+  padding: 16px 18px;
+  margin: 14px 0;
+  text-align: left;
+}
+
+.story-correct-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e5a2c;
+  margin-bottom: 10px;
+}
+
+.story-correct-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.correct-word-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #e8f5e9;
+  color: #1b5e20;
+  border: 1px solid #a5d6a7;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.more-words-badge {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 6px 10px;
+  border-radius: 12px;
+  font-size: 12.5px;
+}
+
+/* Celebration Perfect Card when 0 errors */
+.celebration-perfect-card {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 2px solid #6ee7b7;
+  border-radius: 20px;
+  padding: 24px 20px;
+  margin: 16px 0;
+  text-align: center;
+}
+
+.celebration-perfect-card .celebration-icon {
+  font-size: 44px;
+  margin-bottom: 6px;
+}
+
+.celebration-perfect-card h3 {
+  margin: 0 0 6px;
+  color: #065f46;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.celebration-perfect-card p {
+  margin: 0;
+  color: #047857;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+

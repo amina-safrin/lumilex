@@ -469,6 +469,254 @@ Provide the structured JSON recommendation.`;
 // bespoke, Orton-Gillingham multi-sensory practice sessions.
 // =========================================================
 
+function splitWordSyllables(word) {
+  if (!word) return ["word"];
+  const isLower = String(word) === String(word).toLowerCase();
+  const clean = String(word).trim().toLowerCase().replace(/[^a-z]/g, "");
+  if (!clean) return [String(word)];
+  if (clean.length <= 4) {
+    return [isLower ? clean : (clean.charAt(0).toUpperCase() + clean.slice(1))];
+  }
+
+  const withSeparators = clean
+    .replace(/(ing|tion|sion|ed|er|est|ly|ful|ness|ment|able|ible)$/i, "·$1")
+    .replace(/^(un|re|in|dis|pre|mis)/i, "$1·")
+    .replace(/([bcdfghjklmnpqrstvwxyz])([bcdfghjklmnpqrstvwxyz])/gi, "$1·$2");
+
+  const parts = withSeparators.split("·").filter(Boolean);
+  if (parts.length <= 1) {
+    const mid = Math.floor(clean.length / 2);
+    const p1 = clean.slice(0, mid);
+    const p2 = clean.slice(mid);
+    return [
+      isLower ? p1 : (p1.charAt(0).toUpperCase() + p1.slice(1)),
+      p2,
+    ];
+  }
+  return parts.map((p, idx) => {
+    if (idx === 0 && !isLower) return p.charAt(0).toUpperCase() + p.slice(1);
+    return p;
+  });
+}
+
+function getPhoneticSounds(word) {
+  if (!word) {
+    const def = ["w", "o", "r", "d"];
+    def.formatted = "/w/ - /o/ - /r/ - /d/";
+    return def;
+  }
+  const clean = String(word).trim().toLowerCase().replace(/[^a-z]/g, "");
+  const sounds = [];
+  let i = 0;
+  while (i < clean.length) {
+    const two = clean.slice(i, i + 2);
+    if (["sh", "ch", "th", "wh", "ph", "ck", "qu", "ee", "oo", "ea", "ai", "oa"].includes(two)) {
+      sounds.push(two);
+      i += 2;
+    } else {
+      sounds.push(clean[i]);
+      i += 1;
+    }
+  }
+  sounds.formatted = sounds.map((s) => `/${s}/`).join(" - ");
+  return sounds;
+}
+
+function getPhoneticDistractors(word, readingLevel = "Beginner") {
+  const clean = String(word).trim().toLowerCase().replace(/[^a-z]/g, "");
+  const cap = clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : "Word";
+  if (!clean) return ["Sun", "Star"];
+
+  const distractors = [];
+  const consonants = ["b", "c", "d", "f", "h", "j", "l", "m", "p", "r", "s", "t", "w"];
+  for (const c of consonants) {
+    if (c !== clean[0]) {
+      const candidate = c + clean.slice(1);
+      const capCand = candidate.charAt(0).toUpperCase() + candidate.slice(1);
+      if (capCand !== cap && !distractors.includes(capCand)) {
+        distractors.push(capCand);
+        if (distractors.length >= 2) break;
+      }
+    }
+  }
+
+  if (distractors.length < 2 && clean.length >= 3) {
+    const vowels = ["a", "e", "i", "o", "u"];
+    for (const v of vowels) {
+      if (clean[1] && v !== clean[1]) {
+        const candidate = clean[0] + v + clean.slice(2);
+        const capCand = candidate.charAt(0).toUpperCase() + candidate.slice(1);
+        if (capCand !== cap && !distractors.includes(capCand)) {
+          distractors.push(capCand);
+          if (distractors.length >= 2) break;
+        }
+      }
+    }
+  }
+
+  const defaultBank = ["Hop", "Tip", "Run", "Sun", "Hat", "Bat", "Dot", "Fox"];
+  for (const def of defaultBank) {
+    if (distractors.length >= 2) break;
+    if (def !== cap && !distractors.includes(def)) {
+      distractors.push(def);
+    }
+  }
+
+  return distractors.slice(0, 2);
+}
+
+function validateAndEnforcePracticeQuestions(questions, trickyWords = [], readingLevel = "Beginner") {
+  const safeTricky = Array.isArray(trickyWords) && trickyWords.length > 0
+    ? trickyWords.map((w) => String(w).trim().toLowerCase()).filter(Boolean)
+    : ["story", "friend", "happy"];
+
+  const validTypes = new Set(["speak_loud", "word_select", "letter_build", "sentence_read"]);
+  const validated = [];
+  const rawList = Array.isArray(questions) ? questions : [];
+
+  for (let i = 0; i < rawList.length; i++) {
+    const q = rawList[i];
+    if (!q || typeof q !== "object") continue;
+
+    const id = q.id || `story-q${i + 1}`;
+    let type = validTypes.has(q.type) ? q.type : "word_select";
+    let prompt = q.prompt || "Practice this story word!";
+    let instruction = q.instruction || prompt;
+    let hint = q.hint || "Take your time and sound it out! 🌟";
+
+    if (type === "word_select") {
+      let answer = String(q.answer || safeTricky[i % safeTricky.length] || "Word").trim();
+      let rawChoices = Array.isArray(q.choices) ? q.choices : (Array.isArray(q.options) ? q.options : []);
+      let choices = rawChoices.map((c) => String(c).trim()).filter(Boolean);
+      choices = Array.from(new Set(choices));
+
+      const answerIndex = choices.findIndex((c) => c.toLowerCase() === answer.toLowerCase());
+      if (answerIndex !== -1) {
+        answer = choices[answerIndex];
+      } else {
+        if (choices.length >= 3) {
+          choices[0] = answer;
+        } else {
+          choices.push(answer);
+        }
+      }
+
+      const distractors = getPhoneticDistractors(answer, readingLevel);
+      for (const d of distractors) {
+        if (choices.length >= 3) break;
+        if (!choices.some((c) => c.toLowerCase() === d.toLowerCase())) {
+          choices.push(d);
+        }
+      }
+      choices = choices.slice(0, 3);
+      if (!choices.includes(answer)) {
+        choices[0] = answer;
+      }
+
+      validated.push({
+        id,
+        type: "word_select",
+        prompt,
+        instruction,
+        target_word: q.target_word || q.targetWord || answer,
+        targetWord: q.targetWord || q.target_word || answer,
+        picture: q.picture || "🌟",
+        pictureLabel: q.pictureLabel || answer,
+        choices,
+        options: choices,
+        answer,
+        hint,
+      });
+    } else if (type === "letter_build") {
+      const targetWord = String(q.targetWord || q.answer || safeTricky[i % safeTricky.length] || "WORD").toUpperCase().trim();
+      const targetLetters = targetWord.split("");
+      let letterBank = Array.isArray(q.letterBank)
+        ? q.letterBank.map((l) => String(l).toUpperCase().trim()).filter(Boolean)
+        : [];
+
+      for (const char of targetLetters) {
+        if (!letterBank.includes(char)) {
+          letterBank.push(char);
+        }
+      }
+
+      const distractorPool = ["E", "A", "O", "T", "S", "R", "N", "L"].filter((l) => !targetLetters.includes(l));
+      for (const d of distractorPool) {
+        if (letterBank.length >= targetLetters.length + 2) break;
+        if (!letterBank.includes(d)) {
+          letterBank.push(d);
+        }
+      }
+
+      validated.push({
+        id,
+        type: "letter_build",
+        prompt: prompt || `Spell the word: ${targetWord.toLowerCase()}`,
+        instruction: q.instruction || prompt || `Spell the word: ${targetWord.toLowerCase()}`,
+        target_word: q.target_word || targetWord.toLowerCase(),
+        targetWord,
+        picture: q.picture || "🧩",
+        pictureLabel: q.pictureLabel || targetWord,
+        letterBank,
+        letters: targetWord.toLowerCase().split(""),
+        answer: targetWord,
+        hint,
+      });
+    } else if (type === "sentence_read") {
+      const sentence = String(q.sentence || prompt || "I like to read my friendly story.").trim();
+      const tokens = Array.isArray(q.tokens) && q.tokens.length > 0
+        ? q.tokens.map(String)
+        : sentence.split(/\s+/).filter(Boolean);
+
+      validated.push({
+        id,
+        type: "sentence_read",
+        prompt: prompt || `Read out loud: ${sentence}`,
+        instruction: q.instruction || prompt || `Read out loud: ${sentence}`,
+        sentence,
+        tokens,
+        target_word: q.target_word || q.target_word_focus || safeTricky[0] || "",
+        answer: q.answer || q.target_word_focus || sentence,
+        hint,
+      });
+    } else {
+      const targetWord = String(q.targetWord || q.answer || safeTricky[i % safeTricky.length] || "WORD").toUpperCase().trim();
+      const syllables = Array.isArray(q.syllables) && q.syllables.length > 0
+        ? q.syllables.map(String)
+        : splitWordSyllables(targetWord);
+      const phoneticHint = q.phoneticHint || (Array.isArray(getPhoneticSounds(targetWord)) ? getPhoneticSounds(targetWord).formatted : getPhoneticSounds(targetWord));
+
+      validated.push({
+        id,
+        type: "speak_loud",
+        prompt: prompt || `Read out loud: ${targetWord.toLowerCase()}`,
+        instruction: q.instruction || prompt || `Read out loud: ${targetWord.toLowerCase()}`,
+        target_word: q.target_word || targetWord.toLowerCase(),
+        targetWord,
+        syllables,
+        phoneticHint: typeof phoneticHint === "string" ? phoneticHint : (phoneticHint?.formatted || `/${targetWord.toLowerCase()}/`),
+        picture: q.picture || "📖",
+        pictureLabel: q.pictureLabel || targetWord,
+        hint,
+      });
+    }
+  }
+
+  if (validated.length < 5) {
+    const fallbackObj = generateDeterministicStoryPracticeFallback({
+      trickyWords: safeTricky,
+      readingLevel,
+    });
+    for (const fq of fallbackObj.practiceQuestions) {
+      if (validated.length >= 5) break;
+      fq.id = `story-q${validated.length + 1}`;
+      validated.push(fq);
+    }
+  }
+
+  return validated.slice(0, 5);
+}
+
 function generateDeterministicStoryPracticeFallback({
   storyTitle = "Story Adventure",
   storyTopic = "General",
@@ -476,77 +724,117 @@ function generateDeterministicStoryPracticeFallback({
   identifiedErrors = [],
   childName = "Reader",
   accuracy = 100,
+  readingLevel = "Beginner",
+  correctWords = [],
+  incorrectWords = [],
+  skippedWords = [],
 }) {
   const safeTricky = Array.isArray(trickyWords) && trickyWords.length > 0
-    ? trickyWords.map((w) => String(w).replace(/[^\w]/g, "").trim()).filter(Boolean)
+    ? trickyWords.map((w) => String(w).replace(/[^\w]/g, "").trim().toLowerCase()).filter(Boolean)
     : ["story", "friend", "happy"];
 
   const primaryWord = safeTricky[0] || "story";
-  const secondaryWord = safeTricky[1] || safeTricky[0] || "read";
+  const secondaryWord = safeTricky[1] || safeTricky[0] || "friend";
   const capitalizedPrimary = primaryWord.charAt(0).toUpperCase() + primaryWord.slice(1);
   const capitalizedSecondary = secondaryWord.charAt(0).toUpperCase() + secondaryWord.slice(1);
 
-  // Generate letter bank with 2 distractor letters
+  const primarySyllables = splitWordSyllables(primaryWord);
+  const secondarySyllables = splitWordSyllables(secondaryWord);
+  const primaryPhonetic = getPhoneticSounds(primaryWord);
+  const secondaryPhonetic = getPhoneticSounds(secondaryWord);
+
   const primaryLetters = primaryWord.toUpperCase().split("");
-  const distractorLetters = ["E", "A", "O", "T", "S"].filter((l) => !primaryLetters.includes(l)).slice(0, 2);
+  const distractorLetters = ["E", "A", "O", "T", "S", "R"].filter((l) => !primaryLetters.includes(l)).slice(0, 2);
   const letterBank = [...primaryLetters, ...distractorLetters].sort(() => Math.random() - 0.5);
 
-  const practiceQuestions = [
+  const primaryChoices = [capitalizedPrimary, ...getPhoneticDistractors(primaryWord, readingLevel)];
+
+  let contextSentence = `The happy ${primaryWord} loves to play.`;
+  if (readingLevel === "Intermediate") {
+    contextSentence = `Look at the gentle ${primaryWord} hopping in the garden.`;
+  } else if (readingLevel === "Advanced") {
+    contextSentence = `We discovered a wonderful ${primaryWord} during our grand adventure today.`;
+  }
+
+  const rawQuestions = [
+    // 1. Phonics & Sound Blending
     {
       id: "story-q1",
       type: "speak_loud",
-      prompt: `Read out loud: ${primaryWord}`,
+      prompt: `Listen and blend the sounds: ${primaryPhonetic}`,
       targetWord: primaryWord.toUpperCase(),
-      syllables: [capitalizedPrimary],
-      phoneticHint: primaryWord.toLowerCase().split("").join(" - "),
+      syllables: primarySyllables,
+      phoneticHint: primaryPhonetic,
       picture: "📖",
       pictureLabel: capitalizedPrimary,
-      hint: `Take your time! Blend the sounds in ${primaryWord} smoothly. 🌟`,
+      hint: `Take your time! Blend each sound smoothly: ${primaryPhonetic} -> ${primaryWord}! 🌟`,
     },
+    // 2. Word Recognition (3 unique options, answer guaranteed)
     {
       id: "story-q2",
       type: "word_select",
       prompt: `Which word says ${capitalizedPrimary}?`,
       picture: "🌟",
-      choices: [
-        capitalizedPrimary,
-        capitalizedPrimary.slice(0, -1) + "t",
-        capitalizedPrimary.charAt(0) + "a" + capitalizedPrimary.slice(2),
-      ].filter((v, i, a) => a.indexOf(v) === i),
-      answer: capitalizedPrimary,
-      hint: `Listen closely: ${capitalizedPrimary} starts with letter ${capitalizedPrimary.charAt(0)}! 💡`,
-    },
-    {
-      id: "story-q3",
-      type: "letter_build",
-      prompt: `Spell the word: ${primaryWord}`,
-      targetWord: primaryWord.toUpperCase(),
-      picture: "🧩",
       pictureLabel: capitalizedPrimary,
-      letterBank,
-      answer: primaryWord.toUpperCase(),
-      hint: `Tap the letters one by one to spell ${primaryWord}! 🧱`,
+      choices: primaryChoices,
+      answer: capitalizedPrimary,
+      hint: `Listen closely: ${capitalizedPrimary} begins with the sound /${primaryWord[0]}/! 💡`,
     },
+    // 3. Syllable Blending or Letter Building
+    primaryWord.length >= 5
+      ? {
+          id: "story-q3",
+          type: "speak_loud",
+          prompt: `Say the word parts: ${primarySyllables.join(" · ")}`,
+          targetWord: primaryWord.toUpperCase(),
+          syllables: primarySyllables,
+          phoneticHint: primaryPhonetic,
+          picture: "🧩",
+          pictureLabel: capitalizedPrimary,
+          hint: `Tap each sound tile to hear the parts of ${capitalizedPrimary}! 🧱`,
+        }
+      : {
+          id: "story-q3",
+          type: "letter_build",
+          prompt: `Spell the word: ${primaryWord}`,
+          targetWord: primaryWord.toUpperCase(),
+          picture: "🧩",
+          pictureLabel: capitalizedPrimary,
+          letterBank,
+          answer: primaryWord.toUpperCase(),
+          hint: `Tap the letters one by one to spell ${primaryWord}! 🧱`,
+        },
+    // 4. Context Reading
     {
       id: "story-q4",
+      type: "sentence_read",
+      prompt: `Read the friendly story sentence out loud!`,
+      sentence: contextSentence,
+      tokens: contextSentence.split(/\s+/).filter(Boolean),
+      hint: `Read each friendly word out loud to LumiLex! 📖`,
+    },
+    // 5. Read Again with Confidence
+    {
+      id: "story-q5",
       type: "speak_loud",
       prompt: `Read out loud: ${secondaryWord}`,
       targetWord: secondaryWord.toUpperCase(),
-      syllables: [capitalizedSecondary],
-      phoneticHint: secondaryWord.toLowerCase().split("").join(" - "),
+      syllables: secondarySyllables,
+      phoneticHint: secondaryPhonetic,
       picture: "✨",
       pictureLabel: capitalizedSecondary,
-      hint: `Say ${secondaryWord} out loud to LumiLex! 🎙️`,
-    },
-    {
-      id: "story-q5",
-      type: "sentence_read",
-      prompt: `Read out loud: I love to read ${primaryWord}.`,
-      sentence: `I love to read ${primaryWord}.`,
-      tokens: ["I", "love", "to", "read", `${primaryWord}.`],
-      hint: `Read the friendly story sentence out loud to LumiLex! 📖`,
+      hint: `You've got this! Read ${secondaryWord} loud and clear to LumiLex! 🎙️`,
     },
   ];
+
+  const practiceQuestions = rawQuestions;
+
+  const levelNum =
+    Number(readingLevel) ||
+    parseInt(String(readingLevel).match(/\d+/)?.[0], 10) ||
+    (String(readingLevel).toLowerCase().includes("intermediate") ? 3 :
+     String(readingLevel).toLowerCase().includes("advanced") ? 4 : 1);
+  const diffStr = levelNum >= 3 ? "challenging" : "easy";
 
   return {
     storyTitle,
@@ -555,8 +843,10 @@ function generateDeterministicStoryPracticeFallback({
       ? `We noticed a few tricky sounds in words like "${safeTricky.slice(0, 3).join('", "')}". Practicing them with sound tiles will make them feel familiar and easy!`
       : "You read the story wonderfully! This quick review will keep your reading superpowers sharp.",
     identifiedTrickyWords: safeTricky.slice(0, 5),
+    targetWords: safeTricky,
     targetedSkill: "word_reading",
     practiceQuestions,
+    difficulty: diffStr,
     isFallback: true,
   };
 }
@@ -570,33 +860,55 @@ async function generateStoryPracticeSession({
   trickyWords = [],
   childName = "Reader",
   accuracy = 100,
+  readingLevel = "Beginner",
+  correctWords = [],
+  incorrectWords = [],
+  skippedWords = [],
+  unreadWords = [],
+  attempts = [],
 }) {
   const safeTricky = Array.isArray(trickyWords) && trickyWords.length > 0
-    ? trickyWords.map((w) => String(w).replace(/[^\w]/g, "").trim()).filter(Boolean)
+    ? trickyWords.map((w) => String(w).replace(/[^\w]/g, "").trim().toLowerCase()).filter(Boolean)
     : [];
+
+  if (safeTricky.length === 0) {
+    return {
+      success: true,
+      needsPractice: false,
+      modelUsed: "none",
+      practiceSession: null,
+      message: `Splendid reading of "${storyTitle}", ${childName}! You read every assessed word with flying colors! 🌟`,
+      generatedAt: new Date().toISOString(),
+    };
+  }
 
   const errorSummary = {
     storyTitle,
     storyTopic,
+    readingLevel: String(readingLevel || "Beginner"),
     accuracyPercent: Number(accuracy) || 0,
     trickyWords: safeTricky.slice(0, 6),
     caughtErrorsSample: Array.isArray(identifiedErrors) ? identifiedErrors.slice(0, 5) : [],
+    incorrectWords: Array.isArray(incorrectWords) ? incorrectWords.slice(0, 5) : [],
+    skippedWords: Array.isArray(skippedWords) ? skippedWords.slice(0, 5) : [],
     speechExcerpt: String(speechTranscript || "").slice(0, 300),
     expectedExcerpt: String(expectedText || "").slice(0, 300),
   };
 
   const systemPrompt = `You are the Gemma AI Reading Specialist for LumiLex, supporting young children with dyslexia.
 The child just read the story "${storyTitle}" into the microphone (transcribed by Whisper).
+Their reading level is: "${readingLevel || "Beginner"}".
 Your job is to analyze the child's reading errors (substituted, mispronounced, or skipped words) and create a bespoke 5-question multi-sensory Orton-Gillingham practice session.
 
 CRITICAL INSTRUCTIONS:
 1. Treat reading stumbles kindly. For young children with dyslexia, sound substitutions (like b/d reversals or vowel slips) are natural growth opportunities.
 2. The 5 practice questions MUST directly reinforce the tricky words identified: [${safeTricky.slice(0, 5).join(", ")}].
-3. Question types MUST be one of:
-   - "speak_loud": Prompt child to read targetWord aloud to LumiLex (includes syllables, phoneticHint, picture, pictureLabel, hint).
-   - "word_select": 3 clear choices targeting sound discrimination, answer, picture, hint.
-   - "letter_build": Spell the tricky word with a letterBank (targetWord letters + 2 distractors).
-   - "sentence_read": Read aloud a short 4-6 word friendly sentence containing the tricky word (sentence, tokens array, hint).
+3. Practice activities must cover:
+   - Phonics & Sound Blending ("speak_loud"): Identify sounds and blend (targetWord, syllables, phoneticHint like /c/ - /a/ - /t/, hint).
+   - Word Recognition ("word_select"): Choose the word from 3 options (choices must be exactly 3 unique options, answer must match one choice).
+   - Syllable Division / Letter Building ("letter_build" or "speak_loud" with syllables).
+   - Context Reading ("sentence_read"): Read a 4-7 word decodable sentence using the tricky word (sentence, tokens).
+   - Read Again ("speak_loud"): Read the tricky word aloud with confidence.
 4. Output MUST be ONLY valid JSON conforming to this schema:
 {
   "storyTitle": "${storyTitle}",
@@ -608,11 +920,11 @@ CRITICAL INSTRUCTIONS:
     {
       "id": "story-q1",
       "type": "speak_loud",
-      "prompt": "Read out loud: ...",
+      "prompt": "Listen and blend the sounds: ...",
       "targetWord": "...",
       "syllables": ["..."],
       "phoneticHint": "...",
-      "picture": "emoji",
+      "picture": "📖",
       "pictureLabel": "...",
       "hint": "..."
     }
@@ -654,16 +966,31 @@ Generate the tailored practice session JSON.`;
       throw new Error("Gemma did not return practiceQuestions array");
     }
 
+    const validatedQuestions = validateAndEnforcePracticeQuestions(
+      parsed.practiceQuestions,
+      safeTricky,
+      readingLevel
+    );
+
+    const levelNum =
+      Number(readingLevel) ||
+      parseInt(String(readingLevel).match(/\d+/)?.[0], 10) ||
+      (String(readingLevel).toLowerCase().includes("intermediate") ? 3 :
+       String(readingLevel).toLowerCase().includes("advanced") ? 4 : 1);
+
     return {
       success: true,
+      needsPractice: true,
       modelUsed: response.model || OLLAMA_MODEL,
       practiceSession: {
         storyTitle: parsed.storyTitle || storyTitle,
         coachFeedback: parsed.coachFeedback || `Splendid reading of "${storyTitle}", ${childName}!`,
         errorAnalysis: parsed.errorAnalysis || "Focused phonics practice for tricky story words.",
         identifiedTrickyWords: parsed.identifiedTrickyWords || safeTricky,
+        targetWords: parsed.targetWords || safeTricky,
         targetedSkill: parsed.targetedSkill || "word_reading",
-        practiceQuestions: parsed.practiceQuestions,
+        practiceQuestions: validatedQuestions,
+        difficulty: parsed.difficulty || (levelNum >= 3 ? "challenging" : "easy"),
         isFallback: false,
       },
       generatedAt: new Date().toISOString(),
@@ -678,10 +1005,15 @@ Generate the tailored practice session JSON.`;
       identifiedErrors,
       childName,
       accuracy,
+      readingLevel,
+      correctWords,
+      incorrectWords,
+      skippedWords,
     });
 
     return {
       success: true,
+      needsPractice: true,
       modelUsed: "deterministic-story-fallback",
       practiceSession: fallbackSession,
       fallbackReason: apiError.message,
@@ -702,6 +1034,12 @@ module.exports = {
   generateDeterministicFallback,
   generateAdaptiveRecommendation,
   generateDeterministicStoryPracticeFallback,
+  generateDeterministicPracticeSession: generateDeterministicStoryPracticeFallback,
   generateStoryPracticeSession,
+  validateAndEnforcePracticeQuestions,
+  splitWordSyllables,
+  getPhoneticSounds,
+  getPhoneticDistractors,
 };
+
 
